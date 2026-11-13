@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wedding Planner</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#5c0d16">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235c0d16'/%3E%3Ctext x='32' y='44' font-family='Georgia' font-style='italic' font-size='32' fill='%23fbf4ea' text-anchor='middle'%3EV%26amp;F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Jost:wght@400;500;600&family=Pinyon+Script&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="cover" class="cover">
+  <div class="cover-card">
+    <img class="cover-photo" src="img/foto-3.jpg" alt="Foto prewedding">
+    <p class="cover-eyebrow">Wedding Planner</p>
+    <h1 class="cover-names" id="coverNames">Vaditya <span class="amp">&amp;</span> Firda</h1>
+    <p class="cover-date" id="coverDate">10 April 2027</p>
+    <button class="btn cover-btn" id="coverBtn" type="button">Buka Planner</button>
+  </div>
+</div>
+
+<div id="login" class="login-wrap" hidden>
+  <div class="login">
+    <div class="mono" id="loginMono">V &amp; F</div>
+    <div class="date" id="loginDate">WEDDING PLANNER</div>
+    <form id="loginForm">
+      <div><label class="lbl" for="loginEmail">Email</label><input class="field" id="loginEmail" type="email" autocomplete="username" required></div>
+      <div><label class="lbl" for="loginPass">Kata sandi</label><input class="field" id="loginPass" type="password" autocomplete="current-password" required></div>
+      <div class="err" id="loginErr"></div>
+      <button class="btn" type="submit">Masuk</button>
+      <button class="icon-btn" type="button" id="forgotBtn">Lupa kata sandi?</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-row">
+        <div class="brand"><span class="mono" id="mono">V &amp; F</span><span class="sub" id="brandSub">Wedding Planner</span></div>
+        <div class="who"><span class="dot" id="whoDot"></span><span id="whoName" class="hide-sm"></span><button class="btn-ghost-light" id="logoutBtn" type="button">Keluar</button></div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+    </div>
+    <div class="batik" aria-hidden="true"></div>
+  </header>
+  <main id="view"></main>
+  <nav class="tabbar" id="tabbar"></nav>
+</div>
+
+<dialog id="dlg"></dialog>
+<dialog id="menuDlg"></dialog>
+<dialog id="viewer" class="viewer"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="fileInput" accept="application/json,.json" hidden>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

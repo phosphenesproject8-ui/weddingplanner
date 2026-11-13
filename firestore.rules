@@ -1,0 +1,35 @@
+rules_version = '2';
+// Salin seluruh isi file ini ke Firebase Console > Firestore Database > Rules,
+// lalu klik Publish. Email kalian sudah terisi.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isCouple() {
+      return request.auth != null
+        && request.auth.token.email in ['vadityaviardana@gmail.com', 'fatihatulfirdausi@gmail.com'];
+    }
+
+    // Semua data planner: hanya kalian berdua.
+    match /{col}/{id} {
+      allow read, write: if isCouple();
+    }
+
+    // Info undangan boleh dibaca siapa saja (untuk halaman undangan publik).
+    match /public/{id} {
+      allow read: if true;
+    }
+
+    // Tamu boleh MENGIRIM RSVP tanpa login, tapi tidak bisa membaca/mengubah.
+    match /rsvp/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['nama', 'hadir', 'jumlah', 'ucapan', 'createdAt', 'guestId'])
+        && request.resource.data.nama is string
+        && request.resource.data.nama.size() > 0 && request.resource.data.nama.size() <= 80
+        && request.resource.data.hadir in ['ya', 'tidak', 'ragu']
+        && request.resource.data.jumlah is int
+        && request.resource.data.jumlah >= 0 && request.resource.data.jumlah <= 10
+        && request.resource.data.ucapan is string && request.resource.data.ucapan.size() <= 500
+        && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40
+        && (!('guestId' in request.resource.data) || (request.resource.data.guestId is string && request.resource.data.guestId.size() <= 40));
+    }
+  }
+}
