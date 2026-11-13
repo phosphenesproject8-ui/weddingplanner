@@ -15,6 +15,8 @@ const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const rp = (n) => "Rp" + Math.round(num(n)).toLocaleString("id-ID");
 const rpShort = (n) => { n = num(n); if (Math.abs(n) >= 1e6) return "Rp" + (n / 1e6).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " jt"; if (Math.abs(n) >= 1e3) return "Rp" + Math.round(n / 1e3) + " rb"; return rp(n); };
 const sum = (arr, f) => arr.reduce((a, x) => a + num(f(x)), 0);
+// Harga efektif seserahan: harga riil kalau sudah diisi, kalau belum pakai budget
+const sesPrice = (x) => num(x.actual) || num(x.budget);
 const pct = (a, b) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
 const byUrut = (a, b) => num(a.urut) - num(b.urut) || String(a.nama || "").localeCompare(b.nama || "");
 const settings = () => S.data.config.find((d) => d.id === "settings") || {};
@@ -271,7 +273,7 @@ const budgetCats = () => [...new Set(["WO & Paket", "Venue", "Catering", "Dekora
 PAGES.anggaran = () => {
   const b = [...S.data.budget].sort(byUrut), st = settings();
   const total = sum(b, (x) => x.qty * x.harga), paid = sum(b, (x) => sum(x.pembayaran || [], (p) => p.jumlah));
-  const sesB = sum(S.data.seserahan, (x) => x.budget), mahar = sum(S.data.mahar, (x) => x.harga);
+  const sesB = sum(S.data.seserahan, sesPrice), mahar = sum(S.data.mahar, (x) => x.harga);
   const grand = total + sesB + mahar, target = num(st.targetBudget);
   const cats = {}; b.forEach((x) => { const c = x.kategori || "Lainnya"; cats[c] = cats[c] || { t: 0, p: 0 }; cats[c].t += x.qty * x.harga; cats[c].p += sum(x.pembayaran || [], (p) => p.jumlah); });
   const maxCat = Math.max(1, ...Object.values(cats).map((c) => c.t));
@@ -487,28 +489,29 @@ const MAHAR_FIELDS = (cats) => [
 const sesCats = () => [...new Set(["Prayer Set", "Toiletries", "Body Care", "Skincare", "Make Up", "Underwear", "Accessories", ...S.data.seserahan.map((x) => x.kategori).filter(Boolean)])];
 const maharCats = () => [...new Set(["Perhiasan", "Uang", "Logam Mulia", "Alat Sholat", ...S.data.mahar.map((x) => x.kategori).filter(Boolean)])];
 const CAT = {
-  seserahan: { title: "seserahan", fields: () => SES_FIELDS(sesCats()), price: "budget", def: { toko: "Shopee" } },
-  mahar: { title: "mahar", fields: () => MAHAR_FIELDS(maharCats()), price: "harga", def: {} }
+  seserahan: { title: "seserahan", fields: () => SES_FIELDS(sesCats()), price: sesPrice, def: { toko: "Shopee" } },
+  mahar: { title: "mahar", fields: () => MAHAR_FIELDS(maharCats()), price: (x) => num(x.harga), def: {} }
 };
 function catCard(col, kat, items, ci = 0) {
   const c = CAT[col];
   const linkIcon = (x) => x.link ? `<a class="icon-btn" href="${esc(x.link)}" target="_blank" rel="noopener" title="${esc(x.toko || "Buka link")}" aria-label="Buka link">${icon("link", 16)}</a>` : "";
   const done = items.filter((x) => x.done).length;
+  const catTot = sum(items, c.price), catPaid = sum(items.filter((x) => x.done), c.price);
   return `<div class="card tint" style="${palVar(ci + (col === "mahar" ? 5 : 0))}"><div class="cat-head"><h3 style="margin:0;min-width:0;overflow-wrap:anywhere"><span class="cat-dot">${icon(col === "mahar" ? "ring" : "gift", 15)}</span>${esc(kat)} <small style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none">· ${done}/${items.length}</small></h3>
-    <div class="acts"><span class="num" style="font-size:13px;margin-right:4px">${rp(sum(items, (x) => x[c.price]))}</span><button class="icon-btn" data-act="addInCat" data-col="${col}" data-cat="${esc(kat)}" aria-label="Tambah item" title="Tambah item">${icon("plus", 16)}</button><button class="icon-btn" data-act="renCat" data-col="${col}" data-cat="${esc(kat)}" aria-label="Ubah kategori" title="Ubah nama kategori">${icon("edit", 16)}</button></div></div>
+    <div class="acts"><span class="cat-total num" title="Total kategori (harga riil, atau budget kalau riil belum diisi)">${rp(catTot)}<small>dibeli ${rp(catPaid)}</small></span><button class="icon-btn" data-act="addInCat" data-col="${col}" data-cat="${esc(kat)}" aria-label="Tambah item" title="Tambah item">${icon("plus", 16)}</button><button class="icon-btn" data-act="renCat" data-col="${col}" data-cat="${esc(kat)}" aria-label="Ubah kategori" title="Ubah nama kategori">${icon("edit", 16)}</button></div></div>
     <ul class="check-list" style="margin-top:6px">${items.map((x) => `<li class="${x.done ? "done" : ""}"><input type="checkbox" class="box" id="ck_${x.id}" data-change="toggleItem" data-col="${col}" data-id="${x.id}" ${x.done ? "checked" : ""} aria-label="Siap">
       <div class="name"><span>${esc(x.nama)}</span><small>${[x.brand, col === "mahar" && x.karat, col === "mahar" && x.berat && num(x.berat).toLocaleString("id-ID") + " gr", x.catatan].filter(Boolean).map(esc).join(" · ")}</small></div>
-      <div style="text-align:right;font-size:13px;flex:none" class="num">${x[c.price] ? rp(x[c.price]) : "–"}${x.actual ? `<br><small style="color:${x.actual > x.budget ? "var(--rose)" : "var(--ok)"}">riil ${rp(x.actual)}</small>` : ""}</div>
+      <div class="item-price num">${col === "seserahan" && num(x.actual) ? `<b class="riil ${num(x.budget) && num(x.actual) > num(x.budget) ? "over" : ""}">${rp(x.actual)}</b><small>budget ${num(x.budget) ? rp(x.budget) : "–"}</small>` : `<b>${c.price(x) ? rp(c.price(x)) : "–"}</b>${col === "seserahan" && c.price(x) ? `<small>budget</small>` : ""}`}</div>
       ${linkIcon(x)}<button class="icon-btn" data-act="editItem" data-col="${col}" data-id="${x.id}" aria-label="Ubah">${icon("edit", 16)}</button></li>`).join("")}</ul></div>`;
 }
 const groupBy = (arr) => { const m = new Map(); [...arr].sort(byUrut).forEach((x) => { const k = x.kategori || "Lainnya"; if (!m.has(k)) m.set(k, []); m.get(k).push(x); }); return m; };
 PAGES.seserahan = () => {
   const s = S.data.seserahan, m = S.data.mahar;
-  const sb = sum(s, (x) => x.budget), sa = sum(s, (x) => x.actual), mt = sum(m, (x) => x.harga);
+  const st = sum(s, sesPrice), sa = sum(s.filter((x) => x.done), sesPrice), mt = sum(m, (x) => x.harga), mPaid = sum(m.filter((x) => x.done), (x) => x.harga);
   const done = s.filter((x) => x.done).length + m.filter((x) => x.done).length;
-  return `<div class="page-head"><div><h1 class="page-title"><span class="cap">S</span>eserahan &amp; Mahar</h1><p class="page-sub">Tambah kategori dan barang sesuka kalian. Centang barang yang sudah dibeli, isi "harga sebenarnya" untuk pengeluaran riil.</p></div></div>
-  <div class="ticket cream" style="--stub:130px;margin-bottom:16px"><div class="t-main"><div class="t-row"><p class="t-title">${icon("gift", 20)} Seserahan &amp; Mahar</p><div class="t-big">${rp(sb + mt)}</div></div>
-    <div class="grid c3" style="gap:10px"><div><div class="t-label">Budget seserahan</div>${rp(sb)}</div><div><div class="t-label">Sudah keluar (riil)</div>${rp(sa)}</div><div><div class="t-label">Mahar</div>${rp(mt)} · ${sum(m, (x) => x.berat).toLocaleString("id-ID")} gr</div></div></div>
+  return `<div class="page-head"><div><h1 class="page-title"><span class="cap">S</span>eserahan &amp; Mahar</h1><p class="page-sub">Tambah kategori dan barang sesuka kalian. Centang barang yang sudah dibeli. Total memakai harga riil; kalau harga riil belum diisi, dipakai budget.</p></div></div>
+  <div class="ticket cream" style="--stub:130px;margin-bottom:16px"><div class="t-main"><div class="t-row"><p class="t-title">${icon("gift", 20)} Seserahan &amp; Mahar</p><div class="t-big ses-grand">${rp(st + mt)}</div></div>
+    <div class="ses-sum"><div><div class="t-label">Total seserahan</div><div class="sv">${rp(st)}</div></div><div><div class="t-label">Sudah dibeli</div><div class="sv">${rp(sa)}</div></div><div><div class="t-label">Belum dibeli</div><div class="sv">${rp(st - sa)}</div></div><div><div class="t-label">Mahar · ${sum(m, (x) => x.berat).toLocaleString("id-ID")} gr</div><div class="sv">${rp(mt)}</div>${mPaid ? `<small>sudah dibeli ${rp(mPaid)}</small>` : ""}</div></div></div>
     <div class="t-stub"><span class="t-label">Siap</span><b style="font:500 28px/1 var(--f-display)">${done}/${s.length + m.length}</b><div class="barcode"></div></div></div>
   <h2 class="section-title">${icon("gift", 20)} Seserahan</h2>
   <div class="toolbar"><button class="btn outline small" data-act="addCat" data-col="seserahan">${icon("plus", 14)} Kategori baru</button><button class="btn small" data-act="addInCat" data-col="seserahan">${icon("plus", 14)} Barang</button></div>
@@ -619,7 +622,7 @@ const savingsNow = () => sum(S.data.tabungan, (x) => (x.jenis === "Penarikan" ? 
 function needBreakdown() {
   const b = S.data.budget;
   const sisaRab = sum(b, (x) => Math.max(0, x.qty * x.harga - sum(x.pembayaran || [], (p) => p.jumlah)));
-  const ses = sum(S.data.seserahan.filter((x) => !x.done), (x) => x.budget);
+  const ses = sum(S.data.seserahan.filter((x) => !x.done), sesPrice);
   const mahar = sum(S.data.mahar.filter((x) => !x.done), (x) => x.harga);
   return { sisaRab, ses, mahar, total: sisaRab + ses + mahar };
 }
