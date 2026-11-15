@@ -135,12 +135,20 @@ async function main() {
         <button class="send" type="submit">Kirim konfirmasi</button>
       </form>
     </div></div></section>` : ""}
+  <section class="gift-sec" id="giftSec" hidden><div class="wrap">
+    <h2 class="sec-title gift-title">Tanda <span class="script">K</span>asih</h2>
+    <p class="gift-lead">Doa restu Bapak/Ibu/Saudara/i adalah hadiah terindah bagi kami. Bila ingin memberi tanda kasih, berikut pilihannya.</p>
+    <div id="giftRek"></div>
+    <div id="giftList"></div>
+  </div></section>
   <footer><div class="wrap"><p>Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu.</p><div class="thanks">Terima kasih</div><p style="letter-spacing:.3em;text-transform:uppercase;font-size:12px">${P} &amp; ${W}</p></div></footer>`;
 
   const canvas = root.querySelector(".event canvas");
   const repaint = () => paintFlowers(canvas);
   repaint(); let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(repaint, 150); });
   setInterval(() => { const el = document.getElementById("cd"); if (el) el.innerHTML = cd(inv.tanggal); }, 30000);
+
+  loadGifts(api, inv);
 
   const doily = document.getElementById("doily");
   if (doily) doily.onclick = () => { const card = document.getElementById("rsvpCard"); card.hidden = !card.hidden; doily.setAttribute("aria-expanded", String(!card.hidden)); if (!card.hidden) document.getElementById("rNama").focus(); };
@@ -159,5 +167,46 @@ async function main() {
       document.getElementById("rsvpCard").innerHTML = `<h3>Terima kasih</h3><p style="text-align:center;margin:0">Konfirmasi dari <b>${esc(nama)}</b> sudah kami terima.</p>`;
     } catch (err) { console.error(err); btn.disabled = false; msg.textContent = "Gagal mengirim. Coba lagi sebentar."; }
   };
+}
+// ---------- Tanda kasih: amplop digital & daftar kado ----------
+const rpx = (n) => "Rp" + Math.round(+n || 0).toLocaleString("id-ID");
+async function loadGifts(api, inv) {
+  const sec = document.getElementById("giftSec"), rek = (inv.rekening || "").trim();
+  let kado = null, klaim = [];
+  try { kado = await api.getKado(); } catch (e) { console.warn(e); }
+  const items = kado && kado.aktif !== false ? kado.items || [] : [];
+  if (items.length) { try { klaim = await api.getKlaim(); } catch (e) { console.warn(e); } }
+  if (!rek && !items.length) return;
+  sec.hidden = false;
+  if (rek) document.getElementById("giftRek").innerHTML = `<div class="gift-card"><h3>Amplop digital</h3><pre class="rek">${esc(rek)}</pre><button type="button" class="btn-line" id="copyRek">Salin</button></div>`;
+  const cr = document.getElementById("copyRek");
+  if (cr) cr.onclick = async () => { try { await navigator.clipboard.writeText(rek); cr.textContent = "Tersalin ✓"; } catch { cr.textContent = "Salin manual ya"; } };
+  if (!items.length) return;
+  const taken = new Set(klaim.map((k) => k.itemId || k.id));
+  const box = document.getElementById("giftList");
+  const draw = () => {
+    box.innerHTML = `<div class="gift-card"><h3>Daftar kado</h3><p class="gift-note">Pilih satu barang yang ingin dihadiahkan supaya tidak ada kado yang sama. Barang yang sudah dipilih tamu lain ditandai.</p>
+      <ul class="gift-list">${items.map((x) => { const t = taken.has(x.id); return `<li class="${t ? "taken" : ""}"><div class="gi"><b>${esc(x.nama)}</b><small>${[x.kategori, x.harga ? "± " + rpx(x.harga) : ""].filter(Boolean).map(esc).join(" · ")}</small></div>
+        ${x.link ? `<a class="gl" href="${esc(x.link)}" target="_blank" rel="noopener">Lihat</a>` : ""}${t ? `<span class="gtag">Sudah dipilih</span>` : `<button type="button" class="gpick" data-id="${esc(x.id)}">Saya pilih</button>`}</li>`; }).join("")}</ul></div>`;
+    box.querySelectorAll(".gpick").forEach((b) => (b.onclick = () => pick(b.dataset.id)));
+  };
+  const pick = (id) => {
+    const x = items.find((i) => i.id === id), li = box.querySelector(`[data-id="${CSS.escape(id)}"]`).closest("li");
+    li.insertAdjacentHTML("afterend", `<li class="gform"><form><label class="lbl" for="gNama">Nama kamu</label><input class="field" id="gNama" maxlength="80" required value="${esc(to)}"><label class="lbl" for="gPesan" style="margin-top:8px">Pesan (opsional)</label><input class="field" id="gPesan" maxlength="200"><div class="msg" id="gMsg"></div><button class="send" type="submit">Konfirmasi pilih ${esc(x.nama)}</button></form></li>`);
+    box.querySelectorAll(".gpick").forEach((b) => (b.disabled = true));
+    const f = box.querySelector(".gform form");
+    document.getElementById("gNama").focus();
+    f.onsubmit = async (e) => {
+      e.preventDefault(); const nama = document.getElementById("gNama").value.trim(), msg = document.getElementById("gMsg");
+      if (!nama) { msg.textContent = "Mohon isi nama."; return; }
+      const d = { itemId: id, nama, createdAt: new Date().toISOString() };
+      const pesan = document.getElementById("gPesan").value.trim(); if (pesan) d.pesan = pesan;
+      if (gid) d.guestId = gid;
+      f.querySelector("button").disabled = true; msg.textContent = "Menyimpan…";
+      try { await api.sendKlaim(id, d); taken.add(id); draw(); box.insertAdjacentHTML("afterbegin", `<p class="gift-ok">Terima kasih, ${esc(nama)}! <b>${esc(x.nama)}</b> sudah dicatat sebagai kado darimu.</p>`); }
+      catch (err) { console.error(err); taken.add(id); draw(); box.insertAdjacentHTML("afterbegin", `<p class="gift-ok">Maaf, barang ini baru saja dipilih tamu lain. Silakan pilih yang lain.</p>`); }
+    };
+  };
+  draw();
 }
 main();

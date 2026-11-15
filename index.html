@@ -9,17 +9,19 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235c0d16'/%3E%3Ctext x='32' y='44' font-family='Georgia' font-style='italic' font-size='32' fill='%23fbf4ea' text-anchor='middle'%3EV%26amp;F%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Jost:wght@400;500;600&family=Pinyon+Script&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Jost:wght@400;500;600&family=Pinyon+Script&family=Press+Start+2P&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div id="cover" class="cover">
+  <canvas id="coverBg" class="px-bg" aria-hidden="true"></canvas>
   <div class="cover-card">
     <img class="cover-photo" src="img/foto-3.jpg" alt="Foto prewedding">
     <p class="cover-eyebrow">Wedding Planner</p>
     <h1 class="cover-names" id="coverNames">Vaditya <span class="amp">&amp;</span> Firda</h1>
     <p class="cover-date" id="coverDate">10 April 2027</p>
+    <div class="px-scene-wrap"><canvas id="coverScene" class="px" role="img" aria-label="Animasi pixel pasangan pengantin di bawah gapura bunga"></canvas></div>
     <button class="btn cover-btn" id="coverBtn" type="button">Buka Planner</button>
   </div>
 </div>

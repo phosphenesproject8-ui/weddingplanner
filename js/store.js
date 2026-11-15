@@ -121,7 +121,10 @@ export async function publicApi() {
     const ls = localStore();
     return {
       async getInvite() { return (await ls.getAll("public")).find((d) => d.id === "invite") || null; },
-      async sendRsvp(d) { return ls.put("rsvp", d); }
+      async sendRsvp(d) { return ls.put("rsvp", d); },
+      async getKado() { return (await ls.getAll("public")).find((d) => d.id === "kado") || null; },
+      async getKlaim() { return ls.getAll("klaim"); },
+      async sendKlaim(itemId, d) { if ((await ls.getAll("klaim")).some((k) => k.id === itemId)) throw new Error("sudah dipilih"); return ls.put("klaim", { ...d, id: itemId }); }
     };
   }
   const [{ initializeApp }, fs] = await Promise.all([
@@ -130,7 +133,11 @@ export async function publicApi() {
   const db = fs.getFirestore(initializeApp(firebaseConfig));
   return {
     async getInvite() { const s = await fs.getDoc(fs.doc(db, "public", "invite")); return s.exists() ? s.data() : null; },
-    async sendRsvp(d) { return (await fs.addDoc(fs.collection(db, "rsvp"), d)).id; }
+    async sendRsvp(d) { return (await fs.addDoc(fs.collection(db, "rsvp"), d)).id; },
+    async getKado() { const s = await fs.getDoc(fs.doc(db, "public", "kado")); return s.exists() ? s.data() : null; },
+    async getKlaim() { const s = await fs.getDocs(fs.collection(db, "klaim")); return s.docs.map((d) => ({ ...d.data(), id: d.id })); },
+    // id dokumen = id barang, jadi satu barang hanya bisa dipilih satu tamu (aturan hanya izinkan "create")
+    async sendKlaim(itemId, d) { await fs.setDoc(fs.doc(db, "klaim", itemId), d); return itemId; }
   };
 }
 

@@ -618,3 +618,89 @@ body { background-color: var(--page-bg); }
 .ses-grand { font-size: 24px; font-weight: 700; }
 @media (max-width: 720px) { .ses-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ses-sum .sv { font-size: 18px; } }
 @media (max-width: 520px) { .ses-sum { grid-template-columns: 1fr; gap: 8px; } .ses-sum .sv { font-size: 18px; } .ses-grand { font-size: 22px; } }
+
+/* ---------- Pixel art: halaman pembuka & ular tangga ---------- */
+canvas.px { image-rendering: pixelated; image-rendering: crisp-edges; display: block; margin: 0 auto; max-width: 100%; }
+.px-bg { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: 0; }
+.cover-card { z-index: 1; }
+.px-scene-wrap { margin: -6px auto 16px; width: 100%; display: flex; justify-content: center; }
+.px-font { font-family: "Press Start 2P", ui-monospace, monospace; letter-spacing: 0; }
+.ut-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; align-items: center; margin-bottom: 26px; }
+.ut-board { min-width: 0; width: min(504px, 58vw); }
+.ut-pos { display: flex; align-items: baseline; gap: 10px; color: var(--maroon); margin-bottom: 10px; }
+.ut-pos span { font-size: 10px; color: var(--muted); }
+.ut-pos b { font-size: 22px; font-weight: 400; }
+.ut-side p { margin: 0 0 8px; font-size: 14px; }
+.ut-legend { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.ut-legend li { display: flex; gap: 8px; align-items: center; }
+.ut-legend i { width: 10px; height: 10px; flex: none; display: inline-block; }
+.lg-flag { background: #c9a15e; box-shadow: inset 2px 0 0 #8a4a1e; }
+.lg-flag.done { background: #4f7a3a; }
+.lg-heart { background: #b8323f; clip-path: polygon(50% 100%, 0 40%, 0 10%, 25% 0, 50% 20%, 75% 0, 100% 10%, 100% 40%); }
+@media (max-width: 760px) { .ut-card { grid-template-columns: 1fr; } .ut-board { width: 100%; } }
+
+/* ---------- Jumlah pax ---------- */
+.pax-top { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+.pax-ctrl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.pax-ctrl .field { width: 110px; text-align: center; font: 600 22px/1.2 var(--f-body); font-variant-numeric: tabular-nums; padding: 6px 8px; }
+.pax-hint { display: block; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+.pax-sum { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+.pax-sum .t-label { color: var(--muted); }
+.pax-sum b { font: 700 22px/1.2 var(--f-body); color: var(--maroon); font-variant-numeric: tabular-nums; }
+.pax-sum small { color: var(--muted); font-size: 12px; }
+.pax-table .qty-in { width: 84px; text-align: right; padding: 4px 8px; display: inline-block; }
+.pax-table .qty-in:disabled { background: var(--paper-2); color: var(--ink); opacity: 1; }
+.linkish { background: none; border: 0; padding: 0; color: var(--rose); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* ---------- Wishlist ---------- */
+.ticket.gold { background: #8f6a2c; color: #fbf6ec; }
+.pill.prio { font-size: 10.5px; padding: 1px 7px; vertical-align: 2px; }
+.ut-pos .ut-of { font: 500 13px var(--f-body); color: var(--muted); }
+
+/* ---------- Kartu virtual pet di Beranda ---------- */
+.pet { --pk: #f9d3e0; --pk2: #f4b8cc; --mint: #c9eef0; --mint2: #9fd9de; --pline: #4a3346; --scr: #e9e3f7;
+  max-width: 560px; margin: 0 auto 26px; background: var(--pk); border: 3px solid var(--pline); border-radius: 10px; padding: 10px;
+  box-shadow: 0 0 0 4px var(--pk), 0 0 0 7px var(--pline), 6px 10px 0 7px rgba(74,51,70,.18); position: relative; color: var(--pline);
+  background-image: radial-gradient(var(--pk2) 1px, transparent 1.4px); background-size: 8px 8px; }
+.pet .px-font { font-size: 10px; line-height: 1.5; }
+.pet-bar, .pet-bar2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; background: #fdeef3; border: 2px solid var(--pline); }
+.pet-bar { border-bottom: 0; font-size: 12px !important; }
+.pet-bar2 { background: var(--mint); }
+.pet-hearts { display: inline-flex; gap: 2px; }
+.pet-batt { display: inline-flex; align-items: center; gap: 6px; }
+.pet-batt i { width: 30px; height: 14px; border: 2px solid var(--pline); position: relative; background: linear-gradient(90deg, #6cc56b var(--v), #fff var(--v)); }
+.pet-batt i::after { content: ""; position: absolute; right: -5px; top: 3px; width: 3px; height: 4px; background: var(--pline); }
+.pet-screen { position: relative; overflow: hidden; border: 2px solid var(--pline); border-top: 0; background: linear-gradient(180deg, #e7e2f8, #f6e3ef); min-height: 250px; padding: 18px 10px 12px; }
+.pet-bg { position: absolute; inset: 0; pointer-events: none; opacity: .7;
+  background-image: linear-gradient(90deg, rgba(255,255,255,.35) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px); background-size: 12px 12px; }
+.pet-screen::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(180deg, rgba(74,51,70,.05) 0 2px, transparent 2px 4px); }
+.pet-chars { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 10px; }
+.pet-char { margin: 0; text-align: center; animation: petbob 1.2s steps(2) infinite; }
+.pet-char.cpw { animation-delay: .6s; }
+@keyframes petbob { 50% { transform: translateY(-4px); } }
+.pet-photo { display: block; border: 3px solid var(--pline); background: #fff; padding: 3px; cursor: pointer; box-shadow: 4px 4px 0 rgba(74,51,70,.25); }
+.pet-photo canvas { width: clamp(110px, 30vw, 170px); height: auto; aspect-ratio: 4 / 5; }
+.pet-photo:hover { background: var(--mint); }
+.pet-char figcaption { margin-top: 8px; font-size: 9px !important; color: var(--pline); }
+.pet-char figcaption b { display: block; font-weight: 400; font-size: 11px; margin-top: 3px; background: #fff; border: 2px solid var(--pline); padding: 3px 6px; }
+.pet-mid { align-self: center; animation: petbeat 1s steps(2) infinite; margin-bottom: 30px; }
+@keyframes petbeat { 50% { transform: scale(1.18); } }
+.pet-msg { position: relative; margin: 14px auto 0; max-width: 92%; background: #fff; border: 2px solid var(--pline); padding: 7px 10px; text-align: center; font-size: 9.5px !important; min-height: 32px; display: grid; place-items: center; }
+.pet-stats { display: flex; justify-content: space-around; gap: 6px; flex-wrap: wrap; padding: 7px 6px; background: var(--mint); border: 2px solid var(--pline); border-top: 0; }
+.pet-stat { display: inline-flex; align-items: center; gap: 5px; }
+.pet-stat small { font-size: 8px; opacity: .8; }
+.pet-stat .pf { image-rendering: pixelated; }
+.pet-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.pet-btns a, .pet-btns button { font: 400 12px/1 "Press Start 2P", monospace; text-align: center; padding: 12px 4px; background: var(--mint); color: var(--pline); border: 3px solid var(--pline); border-radius: 8px; box-shadow: 0 4px 0 var(--pline); text-decoration: none; cursor: pointer; }
+.pet-btns .love { background: #fdeef3; }
+.pet-btns a:active, .pet-btns button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--pline); }
+.pet-note { margin: 10px 0 0; text-align: center; font-size: 11.5px; color: #7a5a70; }
+.pet-heart { position: absolute; bottom: 30px; animation: petfly 1.8s steps(12) forwards; pointer-events: none; }
+@keyframes petfly { to { transform: translate(var(--dx), -200px); opacity: 0; } }
+@media (max-width: 520px) { .pet .px-font { font-size: 8.5px; } .pet-btns a, .pet-btns button { font-size: 9.5px; padding: 11px 2px; } .pet-stat { font-size: 8px; } }
+
+/* Wishlist: tanda kado */
+.kado-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--teak); background: var(--warn-soft); border-radius: 999px; padding: 1px 8px; margin: 3px 0 1px; width: fit-content; }
+.kado-tag.claimed { color: var(--green); background: var(--ok-soft); }
+.kado-card { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.kado-switch { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; white-space: nowrap; }

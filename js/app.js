@@ -1,8 +1,9 @@
 import { createStore, isCloud } from "./store.js";
 import { allowedEmails } from "./config.js";
 import { icon, ICON_NAMES } from "./icons.js";
+import { startCover, setBoard, mountBoard, replayBoard, pixelatePhoto, pixelFace, pixelHeart, petBurst } from "./pixel.js";
 
-const COLS = ["config", "public", "guests", "budget", "tasks", "seserahan", "mahar", "vendors", "rundown", "rsvp", "timeline", "tabungan"];
+const COLS = ["config", "public", "guests", "budget", "tasks", "seserahan", "mahar", "vendors", "rundown", "rsvp", "timeline", "tabungan", "wishlist", "amplop", "klaim"];
 const DATA_COLS = COLS; // yang ikut backup
 const S = { data: Object.fromEntries(COLS.map((c) => [c, []])), loaded: new Set(), ui: {} };
 let store, unsubs = [];
@@ -103,7 +104,7 @@ const palVar = (i) => { const [c, soft] = PAL[((i % PAL.length) + PAL.length) % 
 // [kunci, label, ikon, warna ikon di header marun, warna aksen halaman]
 const NAV = [
   ["beranda", "Beranda", "home", "#f2c46d", "#5c0d16"], ["anggaran", "Anggaran", "wallet", "#e8a07f", "#a8553a"], ["tabungan", "Tabungan", "piggy", "#c6cf6e", "#2f4a2b"],
-  ["tamu", "Tamu & RSVP", "guests", "#edc6c4", "#7a1a2a"], ["persiapan", "Persiapan", "check", "#e2b77a", "#8a4a1e"], ["seserahan", "Seserahan & Mahar", "gift", "#e8a9b2", "#9b5662"],
+  ["tamu", "Tamu & RSVP", "guests", "#edc6c4", "#7a1a2a"], ["persiapan", "Persiapan", "check", "#e2b77a", "#8a4a1e"], ["seserahan", "Seserahan & Mahar", "gift", "#e8a9b2", "#9b5662"], ["wishlist", "Wishlist Rumah", "heart", "#f2c46d", "#8f6a2c"], ["amplop", "Amplop & Kado", "coin", "#e8a07f", "#a8553a"],
   ["vendor", "Vendor", "store", "#c9a15e", "#8f6a2c"], ["rundown", "Rundown", "clock", "#a9c48a", "#2f4a2b"], ["moodboard", "Moodboard", "palette", "#c6cf6e", "#7a1a2a"],
   ["undangan", "Undangan", "envelope", "#edc6c4", "#7a1a2a"], ["pengaturan", "Pengaturan", "gear", "#d8c7a8", "#8a4a1e"]
 ];
@@ -144,6 +145,7 @@ function render() {
     $("#view").innerHTML = PAGES[page]() + `<div class="batik light" aria-hidden="true"></div>`;
     if (actId) { const el = document.getElementById(actId); if (el && el.closest("#view")) { el.focus(); try { el.setSelectionRange(sel, sel); } catch {} } }
     window.scrollTo(0, scroll);
+    if (page === "beranda") { mountBoard(); mountPet(); }
   });
 }
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
@@ -154,6 +156,7 @@ document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-act]");
   if (!el || !el.closest("#view")) return;
   const a = e.target.closest("a[href]"); if (a && a !== el && el.contains(a)) return; // biarkan link berjalan
+  const fc = e.target.closest("input,select,textarea,label"); if (fc && fc !== el && el.contains(fc)) return; // biarkan kotak centang/isian bekerja
   const fn = ACT[el.dataset.act]; if (fn) { e.preventDefault(); fn(el, e); }
 });
 document.addEventListener("change", (e) => {
@@ -194,12 +197,14 @@ PAGES.beranda = () => {
       <div class="cd-row" id="cd">${countdownHtml(st.tanggal)}</div>
     </div>
   </section>
+  ${petHtml()}
   <div class="quick">
     ${tile("anggaran", "wallet", "var(--maroon)", "var(--paper)", "Sisa bayar", rpShort(total - paid), `${pct(paid, total)}% dari ${rpShort(total)} terbayar`)}
     ${tile("tabungan", "piggy", "var(--maroon-soft)", "var(--maroon)", "Tabungan", rpShort(savingsNow()), S.data.tabungan.length ? "uang terkumpul" : "belum dicatat")}
-    ${tile("tamu", "guests", "var(--ok-soft)", "var(--green)", "Tamu", `${pax} orang`, `${g.length} undangan · ${hadir} hadir`)}
+    ${tile("tamu", "guests", "var(--ok-soft)", "var(--green)", "Tamu", `${pax} orang`, `${g.length} undangan · ${hadir} hadir${num(st.kapasitasCatering) ? ` · target ${num(st.kapasitasCatering)} pax` : ""}`)}
     ${tile("persiapan", "check", "var(--warn-soft)", "var(--teak)", "Persiapan", `${pct(tDone, t.length)}%`, `${tDone} dari ${t.length} selesai`)}
   </div>
+  ${boardHtml()}
   <h2 class="section-title">${icon("calendar", 20)} Timeline menuju ${esc(fmtDate(st.tanggal, { day: "numeric", month: "long" }))}</h2>
   ${timelineHtml()}
   ${rsvp.length ? `<h2 class="section-title">${icon("envelope", 20)} RSVP terbaru</h2><div class="card"><ul class="mini-list">${rsvp.map((r) => `<li><span style="min-width:0">${esc(r.nama)}<br><small style="color:var(--muted)">${esc((r.ucapan || "").slice(0, 80))}</small></span>${rsvpPill(r.hadir)}</li>`).join("")}</ul></div>` : ""}`;
@@ -210,7 +215,113 @@ function countdownHtml(iso) {
   const d = Math.floor(ms / 864e5), h = Math.floor((ms % 864e5) / 36e5), m = Math.floor((ms % 36e5) / 6e4);
   return `<div class="cd-box"><b>${d}</b><span>Hari</span></div><div class="cd-box"><b>${h}</b><span>Jam</span></div><div class="cd-box"><b>${m}</b><span>Menit</span></div>`;
 }
-setInterval(() => { const el = $("#cd"); if (el) el.innerHTML = countdownHtml(settings().tanggal); }, 30000);
+setInterval(() => { const el = $("#cd"); if (el) el.innerHTML = countdownHtml(settings().tanggal); const c = $("#petClock"); if (c) c.textContent = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":"); }, 30000);
+
+// ---------- Kartu virtual pet: foto CPP & CPW versi pixel ----------
+const fotoCfg = () => S.data.config.find((d) => d.id === "foto") || {};
+const PET_DEF = { cpp: ["img/foto-4.jpg", [0.49, 0.375, 0.2, 0.22]], cpw: ["img/foto-2.jpg", [0.22, 0.1, 0.56, 0.42]] };
+function petStats() {
+  const st = settings(), t = S.data.tasks, b = S.data.budget;
+  const prep = pct(t.filter((x) => x.status === "Selesai").length, t.length);
+  const nb = needBreakdown(), saldo = savingsNow(), target = num(st.tabunganTarget) || nb.total;
+  const dana = pct(saldo, target);
+  const total = sum(b, (x) => x.qty * x.harga), paid = sum(b, (x) => sum(x.pembayaran || [], (p) => p.jumlah));
+  const bayar = pct(paid, total);
+  const tl = [...S.data.timeline].sort((a, c) => String(a.tgl).localeCompare(c.tgl)).find((x) => !x.done);
+  return { prep, dana, bayar, tl };
+}
+const mood = (v) => (v >= 60 ? "senang" : v >= 25 ? "biasa" : "sedih");
+function petHtml() {
+  const st = settings(), { prep, dana, bayar, tl } = petStats();
+  const hearts = Array.from({ length: 5 }, (_, i) => pixelHeart(Math.max(0, Math.min(1, prep / 20 - i)) >= 1 ? 1 : prep / 20 - i >= 0.5 ? 0.5 : 0, 20)).join("");
+  const left = st.tanggal ? Math.max(0, daysBetween(todayIso(), st.tanggal)) : null;
+  const now = new Date(), clock = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
+  const handle = "@" + `${st.pria || "cpp"}_${st.wanita || "cpw"}`.toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const msgs = [
+    dana < 25 ? "Dompet lagi lapar, yuk setor tabungan!" : dana < 60 ? "Tabungan mulai kenyang, lanjutkan!" : "Tabungan kenyang, mantap!",
+    tl ? `Misi berikutnya: ${tl.judul}` : "Semua misi timeline beres!",
+    prep >= 60 ? "Persiapan lancar, kalian keren!" : `Persiapan ${prep}%, semangat berdua!`,
+    left != null ? (left > 0 ? `${left} hari lagi menuju pelaminan` : "Hari H! Selamat menempuh hidup baru!") : ""
+  ].filter(Boolean);
+  const stat = (k, v) => `<span class="pet-stat">${k} ${pixelFace(mood(v))}<small>${v}%</small></span>`;
+  const portrait = (who, name) => `<figure class="pet-char ${who}"><button type="button" class="pet-photo" data-act="petPhoto" data-who="${who}" aria-label="Ganti foto ${who.toUpperCase()}" title="Klik untuk ganti foto"><canvas id="pet_${who}" class="px" aria-hidden="true"></canvas></button><figcaption class="px-font">${who.toUpperCase()}<b>${esc(name)}</b></figcaption></figure>`;
+  return `<section class="pet" aria-label="Kartu pixel ${esc(st.pria || "CPP")} dan ${esc(st.wanita || "CPW")}">
+    <div class="pet-bar px-font"><span class="pet-hearts" title="Persiapan ${prep}%">${hearts}</span><span class="pet-batt" title="Tabungan ${dana}% dari target"><i style="--v:${Math.max(4, dana)}%"></i>${dana}%</span><span id="petClock">${esc(clock)}</span></div>
+    <div class="pet-bar2 px-font"><span>LEVEL: ${left != null ? (left > 0 ? "H-" + left : "HARI H") : "-"}</span><span>DATE: ${esc(now.toLocaleDateString("id-ID", { day: "numeric", month: "short" }).toUpperCase())}</span><span class="hide-sm">${esc(handle)}</span></div>
+    <div class="pet-screen" id="petScreen">
+      <div class="pet-bg" aria-hidden="true"></div>
+      <div class="pet-chars">${portrait("cpp", st.pria || "Vaditya")}<span class="pet-mid" aria-hidden="true">${pixelHeart(1, 30)}</span>${portrait("cpw", st.wanita || "Firda")}</div>
+      <div class="pet-msg px-font" id="petMsg" data-msgs="${esc(JSON.stringify(msgs))}">${esc(msgs[0])}</div>
+    </div>
+    <div class="pet-stats px-font">${stat("PERSIAPAN", prep)}${stat("DANA", dana)}${stat("BAYAR", bayar)}</div>
+    <div class="pet-btns px-font"><a href="#persiapan">TUGAS</a><a href="#tabungan">DANA</a><button type="button" class="love" data-act="petLove">LOVE</button><button type="button" data-act="petGame">MAIN</button></div>
+    <p class="pet-note">Klik foto untuk mengganti foto CPP atau CPW.</p>
+  </section>`;
+}
+let petMsgTimer;
+function mountPet() {
+  const f = fotoCfg();
+  ["cpp", "cpw"].forEach((w) => { const cv = document.getElementById("pet_" + w); if (!cv) return; const src = f[w] || PET_DEF[w][0]; pixelatePhoto(cv, src, f[w] ? [0, 0, 1, 1] : PET_DEF[w][1], 40, 50); });
+  clearInterval(petMsgTimer); let i = 0;
+  petMsgTimer = setInterval(() => { const el = document.getElementById("petMsg"); if (!el) return clearInterval(petMsgTimer); const m = JSON.parse(el.dataset.msgs || "[]"); if (!m.length) return; i = (i + 1) % m.length; el.textContent = m[i]; }, 4000);
+}
+ACT.petLove = () => petBurst(document.getElementById("petScreen"));
+ACT.petGame = () => { const b = document.getElementById("ularTangga"); if (b) { b.scrollIntoView({ behavior: "smooth", block: "center" }); replayBoard(); mountBoard(); } };
+ACT.petPhoto = (el) => {
+  const who = el.dataset.who, has = !!fotoCfg()[who];
+  openInfo(`Foto ${who.toUpperCase()}`, `<p style="margin:0 0 10px;font-size:14px">Pilih foto ${who === "cpp" ? "calon pengantin pria" : "calon pengantin wanita"}. Foto close-up wajah paling bagus. Foto dikecilkan otomatis lalu ditampilkan versi pixel.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="petPick">Pilih foto</button>${has ? `<button class="btn outline" type="button" id="petReset">Pakai foto bawaan</button>` : ""}</div>`);
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+  $("#petPick").onclick = () => inp.click();
+  inp.onchange = async () => {
+    const file = inp.files[0]; if (!file) return;
+    try { const data = await shrinkPhoto(file); dlg().close(); await save("config", { ...fotoCfg(), id: "foto", [who]: data }, "Foto diganti"); }
+    catch (e) { toast("Foto tidak bisa dibaca"); }
+  };
+  const r = $("#petReset"); if (r) r.onclick = async () => { dlg().close(); const o = { ...fotoCfg(), id: "foto" }; delete o[who]; await save("config", o, "Kembali ke foto bawaan"); };
+};
+// kecilkan foto ke 120×150 (potong tengah, sedikit ke atas agar wajah masuk), simpan sebagai JPEG kecil
+function shrinkPhoto(file) {
+  return new Promise((ok, no) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const W = 120, H = 150, c = document.createElement("canvas"); c.width = W; c.height = H;
+      const r = W / H; let sw = im.width, sh = im.height, sx = 0, sy = 0;
+      if (sw / sh > r) { sw = sh * r; sx = (im.width - sw) / 2; } else { sh = sw / r; sy = (im.height - sh) * 0.25; }
+      c.getContext("2d").drawImage(im, sx, sy, sw, sh, 0, 0, W, H);
+      URL.revokeObjectURL(url); ok(c.toDataURL("image/jpeg", 0.85));
+    };
+    im.onerror = no; im.src = url;
+  });
+}
+
+// ---------- Ular tangga menuju hari H ----------
+const isoTime = (iso) => new Date(iso + "T00:00:00").getTime();
+function boardStart() {
+  const st = settings();
+  if (st.mulai) return st.mulai;
+  const tl = S.data.timeline.map((x) => x.tgl).filter(Boolean).sort()[0];
+  return tl && tl < todayIso() ? tl : "2026-11-01";
+}
+function boardHtml() {
+  const st = settings(); if (!st.tanggal) return "";
+  const start = boardStart(), today = todayIso();
+  const items = [...S.data.timeline].filter((x) => x.tgl).sort((a, b) => String(a.tgl).localeCompare(b.tgl));
+  const next = items.find((x) => !x.done);
+  const sq = setBoard({ start: isoTime(start), end: isoTime(st.tanggal), today: isoTime(today), milestones: items.map((x) => ({ date: isoTime(x.tgl), done: !!x.done, next: x === next })) });
+  const left = Math.max(0, daysBetween(today, st.tanggal)), total = Math.max(1, daysBetween(start, st.tanggal));
+  return `<h2 class="section-title">${icon("sparkle", 20)} Perjalanan menuju hari H</h2>
+  <div class="card ut-card"><div class="ut-board"><canvas id="ularTangga" class="px" role="img" aria-label="Papan ular tangga: kalian di kotak ${sq} dari 100, ${left} hari lagi menuju hari H"></canvas></div>
+    <div class="ut-side">
+      <div class="ut-pos"><span class="px-font">KOTAK</span><b class="px-font" id="utPos">${sq}</b><span class="ut-of">dari 100</span></div>
+      <p>${left > 0 ? `Tinggal <b>${left} hari</b> lagi. Pion kalian maju sendiri setiap hari dari ${esc(fmtDate(start, { day: "numeric", month: "short", year: "numeric" }))} sampai kotak 100, hari H.` : `<b>Hari H sudah tiba!</b> Selamat menempuh hidup baru.`}</p>
+      <div class="bar" style="margin:4px 0 12px"><i style="width:${pct(total - left, total)}%"></i></div>
+      <ul class="ut-legend"><li><i class="lg-flag done"></i>Langkah timeline selesai</li><li><i class="lg-flag"></i>Langkah belum selesai${next ? ` (berkedip = berikutnya: ${esc(next.judul)})` : ""}</li><li><i class="lg-heart"></i>Kotak 100: hari pernikahan</li></ul>
+      <button class="btn outline small" data-act="replayBoard">${icon("sparkle", 14)} Main lagi dari kotak 1</button>
+      <small style="display:block;color:var(--muted);margin-top:8px">Tangga dan ular hanya hiasan. Tanggal mulai bisa diubah di Pengaturan.</small>
+    </div></div>`;
+}
+ACT.replayBoard = () => { replayBoard(); mountBoard(); };
 
 // ---------- Timeline ----------
 const daysBetween = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 864e5);
@@ -265,6 +376,7 @@ const BUDGET_FIELDS = (cats) => [
   { k: "grup", label: "Gabung ke baris (opsional)", type: "datalist", options: [...new Set(["Catering", ...S.data.budget.map((x) => x.grup).filter(Boolean)])], hint: "Item dengan nama grup sama tampil sebagai satu baris total yang bisa dirinci" },
   { k: "qty", label: "Qty", type: "number" },
   { k: "harga", label: "Harga satuan (Rp)", type: "number" },
+  { k: "ikutPax", label: "Qty mengikuti jumlah pax (otomatis berubah saat jumlah pax diganti)", type: "checkbox", full: true },
   { k: "detail", label: "Detail / isi paket", type: "textarea", full: true },
   { k: "catatan", label: "Catatan", full: true },
   { k: "pembayaran", type: "payments" }
@@ -286,12 +398,48 @@ PAGES.anggaran = () => {
     <div class="card stat"><div class="k">Sisa bayar</div><div class="v">${rp(total - paid)}</div><div class="d">${pct(paid, total)}% terbayar</div></div>
     <div class="card stat"><div class="k">Total kebutuhan</div><div class="v">${rp(grand)}</div><div class="d">RAB + seserahan ${rpShort(sesB)} + mahar ${rpShort(mahar)}${target ? ` · target ${rpShort(target)}` : ""}</div>${target ? `<div class="bar ${grand > target ? "over" : ""}" style="margin-top:8px"><i style="width:${pct(grand, target)}%"></i></div>` : ""}</div>
   </div>
+  ${paxCard()}
   <h2 class="section-title">Per kategori</h2>
   <div class="card"><div class="stack" style="gap:10px">${Object.entries(cats).sort((a, c) => c[1].t - a[1].t).map(([c, v], ci) => `<div style="${palVar(ci)}"><div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px;align-items:center"><span style="min-width:0;overflow-wrap:anywhere">${esc(c)}</span><span class="num" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${rp(v.t)} <small style="color:var(--muted)">· dibayar ${rpShort(v.p)}</small><button class="icon-btn" data-act="addBudget" data-cat="${esc(c)}" aria-label="Tambah item di ${esc(c)}" title="Tambah item di kategori ini">${icon("plus", 15)}</button></span></div><div class="bar" style="margin-top:4px;background:var(--c-soft)"><i style="width:${(v.t / maxCat) * 100}%;background:var(--c)"></i></div></div>`).join("") || `<p class="empty">Belum ada item</p>`}</div></div>
   <h2 class="section-title">Daftar item</h2>
   <div class="toolbar"><input class="grow" id="ui_bQ" data-ui="bQ" placeholder="Cari item, vendor, isi paket…" value="${esc(S.ui.bQ || "")}">${uiSel("bCat", [["", "Semua kategori"], ...Object.keys(cats).map((c) => [c, c])], "Filter kategori")}</div>
   ${budgetTable(list)}`;
 };
+// ---------- Jumlah pax ----------
+const paxNow = () => num(settings().kapasitasCatering);
+const paxLinked = (x) => (x.ikutPax != null ? !!x.ikutPax : paxNow() > 0 && num(x.qty) === paxNow() && (grpOf(x) === "Catering" || x.kategori === "Catering"));
+const paxItems = () => [...S.data.budget].filter((x) => x.ikutPax || grpOf(x) === "Catering" || x.kategori === "Catering").sort(byUrut);
+function paxCard() {
+  const pax = paxNow(), items = paxItems(), g = S.data.guests;
+  const est = sum(g, (x) => x.jumlah), hadir = sum(g.filter((x) => x.konfirmasi === "Hadir"), (x) => x.jumlah);
+  const tot = sum(items, (x) => x.qty * x.harga);
+  return `<h2 class="section-title">${icon("people", 20)} Jumlah pax</h2>
+  <div class="card pax-card">
+    <div class="pax-top">
+      <div><label class="lbl" for="paxInput">Jumlah pax (porsi / target tamu)</label>
+        <div class="pax-ctrl"><button type="button" class="btn outline small" data-act="paxStep" data-d="-50">−50</button><button type="button" class="btn outline small" data-act="paxStep" data-d="-10">−10</button>
+        <input class="field" id="paxInput" type="number" inputmode="numeric" min="0" step="1" value="${pax || ""}" placeholder="mis. 400" data-change="setPax">
+        <button type="button" class="btn outline small" data-act="paxStep" data-d="10">+10</button><button type="button" class="btn outline small" data-act="paxStep" data-d="50">+50</button></div>
+        <small class="pax-hint">Dari daftar tamu: <b>${est}</b> orang (${hadir} konfirmasi hadir). ${est && est !== pax ? `<button type="button" class="linkish" data-act="paxFromGuests" data-v="${est}">Pakai ${est}</button>` : ""}</small></div>
+      <div class="pax-sum"><span class="t-label">Total catering</span><b class="num">${rp(tot)}</b><small>${pax ? `≈ ${rp(tot / pax)} per pax` : ""}</small></div>
+    </div>
+    ${items.length ? `<div class="table-wrap" style="margin-top:12px"><table class="pax-table"><thead><tr><th>Item</th><th class="num">Qty / porsi</th><th>Ikut pax</th><th class="num">Harga</th><th class="num">Subtotal</th></tr></thead><tbody>
+    ${items.map((x) => `<tr><td>${esc(String(x.nama).replace(/^Catering\s*[–-]\s*/, ""))}</td><td class="num"><input class="field qty-in" type="number" inputmode="numeric" min="0" value="${num(x.qty)}" data-change="setQty" data-id="${x.id}" aria-label="Qty ${esc(x.nama)}" ${paxLinked(x) ? "disabled" : ""}></td><td><input type="checkbox" class="box" data-change="togglePax" data-id="${x.id}" ${paxLinked(x) ? "checked" : ""} aria-label="Ikut jumlah pax"></td><td class="num">${rp(x.harga)}</td><td class="num"><b>${rp(x.qty * x.harga)}</b></td></tr>`).join("")}
+    </tbody></table></div><small class="pax-hint">Centang <b>Ikut pax</b> agar qty item sama dengan jumlah pax. Yang tidak dicentang (mis. stall 250 porsi) bisa diisi sendiri di kolom qty.</small>` : `<p class="pax-hint">Belum ada item catering. Item anggaran dengan kategori Catering, atau yang dicentang “Qty mengikuti jumlah pax”, akan muncul di sini.</p>`}
+  </div>`;
+}
+async function applyPax(v) {
+  v = Math.max(0, Math.round(num(v)));
+  const linked = paxItems().filter(paxLinked);
+  await save("config", { ...settings(), id: "settings", kapasitasCatering: v }, `Jumlah pax: ${v}`);
+  if (linked.length) await store.bulk("budget", linked.map((x) => ({ ...x, qty: v, ikutPax: true, updatedAt: new Date().toISOString() })));
+}
+ACT.setPax = (el) => applyPax(el.value);
+ACT.paxStep = (el) => applyPax(paxNow() + num(el.dataset.d));
+ACT.paxFromGuests = (el) => applyPax(el.dataset.v);
+ACT.setQty = (el) => { const x = S.data.budget.find((d) => d.id === el.dataset.id); save("budget", { ...x, qty: Math.max(0, num(el.value)), ikutPax: false }, "Qty disimpan"); };
+ACT.togglePax = (el) => { const x = S.data.budget.find((d) => d.id === el.dataset.id); save("budget", { ...x, ikutPax: el.checked, ...(el.checked && paxNow() ? { qty: paxNow() } : {}) }, el.checked ? "Item mengikuti jumlah pax" : "Item tidak lagi mengikuti pax"); };
+
 const grpOf = (x) => x.grup || (/^Catering\s*[–-]/.test(x.nama || "") ? "Catering" : "");
 function budgetTable(list) {
   if (!list.length) return `<div class="empty card"><span class="script">Kosong</span>Tidak ada item yang cocok.</div>`;
@@ -353,8 +501,9 @@ function budgetTicket(x) {
     <div class="t-stub"><span class="t-label">${pkg ? "Paket" : lunas ? "Lunas" : "Sisa bayar"}</span><b class="num" style="font-size:14px">${pkg ? "—" : lunas ? "✓" : rpShort(sisa)}</b><div class="barcode"></div><span class="t-label">${paid ? "DP " + rpShort(paid) : "Belum DP"}</span></div>
   </article>`;
 }
-ACT.addBudget = (el) => openForm({ title: el.dataset.newcat ? "Kategori & item baru" : "Item anggaran", fields: BUDGET_FIELDS(budgetCats()).map((f) => f.k === "kategori" && el.dataset.newcat ? { ...f, type: "text", label: "Nama kategori baru", required: true } : f), data: { qty: 1, pembayaran: [], kategori: el.dataset.newcat ? "" : el.dataset.cat || "" }, onSave: (o) => save("budget", { ...o, urut: nextUrut("budget") }) });
-ACT.editB = (el) => { const x = S.data.budget.find((d) => d.id === el.dataset.id); openForm({ title: "Ubah item", fields: BUDGET_FIELDS(budgetCats()), data: x, onSave: (o) => save("budget", o), onDelete: () => del("budget", x.id) }); };
+ACT.addBudget = (el) => openForm({ title: el.dataset.newcat ? "Kategori & item baru" : "Item anggaran", fields: BUDGET_FIELDS(budgetCats()).map((f) => f.k === "kategori" && el.dataset.newcat ? { ...f, type: "text", label: "Nama kategori baru", required: true } : f), data: { qty: 1, pembayaran: [], kategori: el.dataset.newcat ? "" : el.dataset.cat || "" }, onSave: (o) => save("budget", paxSync({ ...o, urut: nextUrut("budget") })) });
+const paxSync = (o) => (o.ikutPax && paxNow() ? { ...o, qty: paxNow() } : o);
+ACT.editB = (el) => { const x = S.data.budget.find((d) => d.id === el.dataset.id); openForm({ title: "Ubah item", fields: BUDGET_FIELDS(budgetCats()), data: { ...x, ikutPax: paxLinked(x) }, onSave: (o) => save("budget", paxSync(o)), onDelete: () => del("budget", x.id) }); };
 ACT.toggleB = (el) => { S.ui.openB = S.ui.openB === el.dataset.id ? null : el.dataset.id; render(); };
 ACT.payB = (el) => {
   const x = S.data.budget.find((d) => d.id === el.dataset.id);
@@ -406,7 +555,7 @@ PAGES.tamu = () => {
   return `<div class="page-head"><div><h1 class="page-title"><span class="cap">T</span>amu &amp; RSVP</h1><p class="page-sub">Daftar undangan kedua pihak. Klik status konfirmasi untuk menggantinya, klik baris untuk mengubah.</p></div><button class="btn" data-act="addG">+ Tambah tamu</button></div>
   <div class="grid c4">
     <div class="card stat"><div class="k">Undangan</div><div class="v">${all.length}</div><div class="d">${fisik} fisik · ${online} online · ${all.length - fisik - online} belum ditentukan</div></div>
-    <div class="card stat"><div class="k">Perkiraan tamu</div><div class="v">${pax} <small style="font-size:15px">orang</small></div>${cap ? `<div class="bar ${pax > cap ? "over" : ""}" style="margin-top:8px"><i style="width:${pct(pax, cap)}%"></i></div><div class="d">Catering ${cap} porsi</div>` : ""}</div>
+    <div class="card stat"><div class="k">Perkiraan tamu</div><div class="v">${pax} <small style="font-size:15px">orang</small></div>${cap ? `<div class="bar ${pax > cap ? "over" : ""}" style="margin-top:8px"><i style="width:${pct(pax, cap)}%"></i></div><div class="d">Target ${cap} pax${pax > cap ? ` · lebih ${pax - cap}` : ` · sisa ${cap - pax}`} · <a href="#anggaran">ubah</a></div>` : ""}</div>
     <div class="card stat"><div class="k">Konfirmasi hadir</div><div class="v">${hadir} <small style="font-size:15px">orang</small></div><div class="d">${belum} undangan belum konfirmasi</div></div>
     <div class="card stat"><div class="k">Per pihak</div><div class="d" style="font-size:13.5px;color:var(--ink)">${pihaks.map((p) => `${esc(p)}: <b>${all.filter((x) => x.pihak === p).length}</b> undangan · ${sum(all.filter((x) => x.pihak === p), (x) => x.jumlah)} org`).join("<br>") || "-"}</div></div>
   </div>
@@ -486,21 +635,37 @@ const MAHAR_FIELDS = (cats) => [
   { k: "link", label: "Link", type: "url", full: true, ph: "https://…" },
   { k: "catatan", label: "Catatan", full: true }, { k: "done", label: "Sudah dibeli", type: "checkbox", full: true }
 ];
+const WISH_FIELDS = (cats) => [
+  { k: "nama", label: "Barang", required: true, full: true },
+  { k: "kategori", label: "Ruangan / kategori", type: "datalist", options: cats },
+  { k: "prioritas", label: "Prioritas", type: "select", options: ["Wajib", "Penting", "Nanti saja"] },
+  { k: "harga", label: "Perkiraan harga (Rp)", type: "number" },
+  { k: "jumlah", label: "Jumlah", type: "number" },
+  { k: "brand", label: "Brand / tipe" },
+  { k: "toko", label: "Toko", type: "datalist", options: ["Shopee", "Tokopedia", "TikTok Shop", "IKEA", "Informa", "Ace", "Offline"] },
+  { k: "link", label: "Link produk", type: "url", full: true, ph: "https://…" },
+  { k: "catatan", label: "Catatan", full: true, ph: "Ukuran, warna, kado dari siapa…" },
+  { k: "done", label: "Sudah punya / sudah dibeli", type: "checkbox", full: true },
+  { k: "kado", label: "Tampilkan di daftar kado undangan (tamu bisa memilih untuk menghadiahkan)", type: "checkbox", full: true }
+];
+const wishCats = () => [...new Set(["Dapur", "Kamar Tidur", "Ruang Tamu", "Kamar Mandi", "Elektronik", "Kebersihan", "Lainnya", ...S.data.wishlist.map((x) => x.kategori).filter(Boolean)])];
+const wishPrice = (x) => num(x.harga) * (num(x.jumlah) || 1);
 const sesCats = () => [...new Set(["Prayer Set", "Toiletries", "Body Care", "Skincare", "Make Up", "Underwear", "Accessories", ...S.data.seserahan.map((x) => x.kategori).filter(Boolean)])];
 const maharCats = () => [...new Set(["Perhiasan", "Uang", "Logam Mulia", "Alat Sholat", ...S.data.mahar.map((x) => x.kategori).filter(Boolean)])];
 const CAT = {
   seserahan: { title: "seserahan", fields: () => SES_FIELDS(sesCats()), price: sesPrice, def: { toko: "Shopee" } },
-  mahar: { title: "mahar", fields: () => MAHAR_FIELDS(maharCats()), price: (x) => num(x.harga), def: {} }
+  mahar: { title: "mahar", fields: () => MAHAR_FIELDS(maharCats()), price: (x) => num(x.harga), def: {} },
+  wishlist: { title: "wishlist", fields: () => WISH_FIELDS(wishCats()), price: wishPrice, def: { prioritas: "Penting", jumlah: 1 }, icon: "home", pal: 2 }
 };
 function catCard(col, kat, items, ci = 0) {
   const c = CAT[col];
   const linkIcon = (x) => x.link ? `<a class="icon-btn" href="${esc(x.link)}" target="_blank" rel="noopener" title="${esc(x.toko || "Buka link")}" aria-label="Buka link">${icon("link", 16)}</a>` : "";
   const done = items.filter((x) => x.done).length;
   const catTot = sum(items, c.price), catPaid = sum(items.filter((x) => x.done), c.price);
-  return `<div class="card tint" style="${palVar(ci + (col === "mahar" ? 5 : 0))}"><div class="cat-head"><h3 style="margin:0;min-width:0;overflow-wrap:anywhere"><span class="cat-dot">${icon(col === "mahar" ? "ring" : "gift", 15)}</span>${esc(kat)} <small style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none">· ${done}/${items.length}</small></h3>
+  return `<div class="card tint" style="${palVar(ci + (col === "mahar" ? 5 : c.pal || 0))}"><div class="cat-head"><h3 style="margin:0;min-width:0;overflow-wrap:anywhere"><span class="cat-dot">${icon(c.icon || (col === "mahar" ? "ring" : "gift"), 15)}</span>${esc(kat)} <small style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none">· ${done}/${items.length}</small></h3>
     <div class="acts"><span class="cat-total num" title="Total kategori (harga riil, atau budget kalau riil belum diisi)">${rp(catTot)}<small>dibeli ${rp(catPaid)}</small></span><button class="icon-btn" data-act="addInCat" data-col="${col}" data-cat="${esc(kat)}" aria-label="Tambah item" title="Tambah item">${icon("plus", 16)}</button><button class="icon-btn" data-act="renCat" data-col="${col}" data-cat="${esc(kat)}" aria-label="Ubah kategori" title="Ubah nama kategori">${icon("edit", 16)}</button></div></div>
     <ul class="check-list" style="margin-top:6px">${items.map((x) => `<li class="${x.done ? "done" : ""}"><input type="checkbox" class="box" id="ck_${x.id}" data-change="toggleItem" data-col="${col}" data-id="${x.id}" ${x.done ? "checked" : ""} aria-label="Siap">
-      <div class="name"><span>${esc(x.nama)}</span><small>${[x.brand, col === "mahar" && x.karat, col === "mahar" && x.berat && num(x.berat).toLocaleString("id-ID") + " gr", x.catatan].filter(Boolean).map(esc).join(" · ")}</small></div>
+      <div class="name"><span>${esc(x.nama)}${col === "wishlist" && x.prioritas ? ` <span class="pill prio ${x.prioritas === "Wajib" ? "red" : x.prioritas === "Penting" ? "gold" : ""}">${esc(x.prioritas)}</span>` : ""}</span>${col === "wishlist" ? kadoTag(x) : ""}<small>${[col === "wishlist" && num(x.jumlah) > 1 && num(x.jumlah) + " pcs", x.brand, col === "wishlist" && x.toko, col === "mahar" && x.karat, col === "mahar" && x.berat && num(x.berat).toLocaleString("id-ID") + " gr", x.catatan].filter(Boolean).map(esc).join(" · ")}</small></div>
       <div class="item-price num">${col === "seserahan" && num(x.actual) ? `<b class="riil ${num(x.budget) && num(x.actual) > num(x.budget) ? "over" : ""}">${rp(x.actual)}</b><small>budget ${num(x.budget) ? rp(x.budget) : "–"}</small>` : `<b>${c.price(x) ? rp(c.price(x)) : "–"}</b>${col === "seserahan" && c.price(x) ? `<small>budget</small>` : ""}`}</div>
       ${linkIcon(x)}<button class="icon-btn" data-act="editItem" data-col="${col}" data-id="${x.id}" aria-label="Ubah">${icon("edit", 16)}</button></li>`).join("")}</ul></div>`;
 }
@@ -520,6 +685,59 @@ PAGES.seserahan = () => {
   <div class="toolbar"><button class="btn outline small" data-act="addCat" data-col="mahar">${icon("plus", 14)} Kategori baru</button><button class="btn small" data-act="addInCat" data-col="mahar">${icon("plus", 14)} Mahar</button></div>
   <div class="grid c2">${[...groupBy(m)].map(([k, it], i) => catCard("mahar", k, it, i)).join("") || `<div class="card empty">Belum ada mahar.</div>`}</div>`;
 };
+// ================= WISHLIST RUMAH =================
+const klaimOf = (id) => S.data.klaim.find((k) => k.itemId === id || k.id === id);
+function kadoTag(x) {
+  const k = klaimOf(x.id);
+  if (k) return `<span class="kado-tag claimed">${icon("gift", 12)} Dipilih ${esc(k.nama)}</span>`;
+  return x.kado ? `<span class="kado-tag">${icon("gift", 12)} Di daftar kado</span>` : "";
+}
+// salin item kado ke dokumen publik agar bisa dibaca halaman undangan tanpa login
+let kadoSyncT;
+function syncKado() {
+  clearTimeout(kadoSyncT);
+  kadoSyncT = setTimeout(async () => {
+    if (!["wishlist", "public", "config"].every((c) => S.loaded.has(c))) return;
+    const items = S.data.wishlist.filter((x) => x.kado && !x.done).sort(byUrut).map((x) => ({ id: x.id, nama: x.nama || "", kategori: x.kategori || "", harga: num(x.harga), link: x.link || "" }));
+    const aktif = settings().kadoAktif !== false;
+    const cur = S.data.public.find((d) => d.id === "kado");
+    const sig = JSON.stringify({ items, aktif });
+    if (cur && JSON.stringify({ items: cur.items || [], aktif: cur.aktif !== false }) === sig) return;
+    if (!cur && !items.length) return;
+    try { await store.put("public", { id: "kado", items, aktif }); } catch (e) { console.warn("sync kado", e); }
+  }, 800);
+}
+PAGES.wishlist = () => {
+  const all = S.data.wishlist, fp = S.ui.wP || "", fs = S.ui.wS || "";
+  const list = all.filter((x) => (!fp || (x.prioritas || "Penting") === fp) && (!fs || (fs === "belum" ? !x.done : x.done)));
+  const tot = sum(all, wishPrice), have = sum(all.filter((x) => x.done), wishPrice), wajib = sum(all.filter((x) => !x.done && x.prioritas === "Wajib"), wishPrice);
+  const done = all.filter((x) => x.done).length;
+  return `<div class="page-head"><div><h1 class="page-title"><span class="cap">W</span>ishlist Rumah</h1><p class="page-sub">Barang yang ingin kalian punya setelah menikah. Kelompokkan per ruangan, beri prioritas, dan centang yang sudah ada. Tidak dihitung ke anggaran pernikahan.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn outline" data-act="addCat" data-col="wishlist">${icon("plus", 14)} Ruangan baru</button><button class="btn" data-act="addInCat" data-col="wishlist">${icon("plus", 14)} Barang</button></div></div>
+  <div class="ticket gold" style="--stub:130px;margin-bottom:16px"><div class="t-main"><div class="t-row"><p class="t-title">${icon("home", 20)} Rumah kita nanti</p><div class="t-big ses-grand">${rp(tot)}</div></div>
+    <div class="ses-sum"><div><div class="t-label">Total perkiraan</div><div class="sv">${rp(tot)}</div></div><div><div class="t-label">Sudah punya</div><div class="sv">${rp(have)}</div></div><div><div class="t-label">Belum</div><div class="sv">${rp(tot - have)}</div></div><div><div class="t-label">Wajib, belum ada</div><div class="sv">${rp(wajib)}</div></div></div></div>
+    <div class="t-stub"><span class="t-label">Terpenuhi</span><b style="font:500 28px/1 var(--f-display)">${done}/${all.length}</b><div class="barcode"></div></div></div>
+  ${wishKadoCard()}
+  <div class="toolbar">${uiSel("wP", [["", "Semua prioritas"], ["Wajib", "Wajib"], ["Penting", "Penting"], ["Nanti saja", "Nanti saja"]], "Prioritas")}${uiSel("wS", [["", "Semua"], ["belum", "Belum punya"], ["sudah", "Sudah punya"]], "Status")}</div>
+  ${all.length ? `<div class="grid c2">${[...groupBy(list)].map(([k, it], i) => catCard("wishlist", k, it, i)).join("") || `<div class="card empty">Tidak ada barang yang cocok dengan filter.</div>`}</div>`
+    : `<div class="card empty"><span style="color:var(--gold)">${icon("home", 40)}</span><p>Belum ada wishlist. Mulai dari ruangan yang paling penting, misalnya Dapur atau Kamar Tidur.</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn small" data-act="seedWish">Isi contoh daftar</button><button class="btn outline small" data-act="addInCat" data-col="wishlist">+ Tambah barang</button></div></div>`}`;
+};
+function wishKadoCard() {
+  const on = settings().kadoAktif !== false, n = S.data.wishlist.filter((x) => x.kado && !x.done).length, cl = S.data.klaim.length;
+  return `<div class="card kado-card"><div style="min-width:0"><h3 style="margin:0 0 4px">${icon("gift", 18)} Daftar kado di undangan</h3>
+    <p style="margin:0;font-size:13px;color:var(--muted)">Barang yang dicentang <b>“Tampilkan di daftar kado”</b> muncul di undangan digital. Tamu bisa memilih satu barang untuk dihadiahkan, jadi tidak ada kado dobel. ${n} barang tampil · ${cl} sudah dipilih tamu.</p></div>
+    <label class="kado-switch"><input type="checkbox" class="box" data-change="kadoAktif" ${on ? "checked" : ""}> Tampilkan di undangan</label></div>`;
+}
+ACT.kadoAktif = (el) => save("config", { ...settings(), id: "settings", kadoAktif: el.checked }, el.checked ? "Daftar kado tampil di undangan" : "Daftar kado disembunyikan");
+
+const WISH_SEED = [
+  ["Dapur", "Kompor 2 tungku", "Wajib", 600000], ["Dapur", "Rice cooker", "Wajib", 450000], ["Dapur", "Set panci & wajan", "Wajib", 500000], ["Dapur", "Kulkas", "Penting", 3000000], ["Dapur", "Dispenser / galon", "Penting", 250000],
+  ["Kamar Tidur", "Kasur & dipan", "Wajib", 3500000], ["Kamar Tidur", "Lemari pakaian", "Wajib", 1500000], ["Kamar Tidur", "Sprei & bantal", "Wajib", 400000],
+  ["Ruang Tamu", "Sofa", "Nanti saja", 2500000], ["Ruang Tamu", "Karpet", "Nanti saja", 400000],
+  ["Elektronik", "Mesin cuci", "Penting", 2500000], ["Elektronik", "Kipas angin / AC", "Penting", 400000], ["Kebersihan", "Setrika & meja setrika", "Penting", 350000], ["Kebersihan", "Sapu, pel, ember", "Wajib", 150000]
+];
+ACT.seedWish = async () => { await store.bulk("wishlist", WISH_SEED.map(([kategori, nama, prioritas, harga], i) => ({ kategori, nama, prioritas, harga, jumlah: 1, done: false, urut: i + 1 }))); toast("Contoh wishlist dimuat. Ubah atau hapus sesuai kebutuhan."); };
+
 ACT.addCat = (el) => {
   const col = el.dataset.col, c = CAT[col];
   openForm({ title: `Kategori ${c.title} baru`, fields: [{ k: "kategori", label: "Nama kategori", required: true, full: true }, ...c.fields().filter((f) => f.k !== "kategori").map((f) => f.k === "nama" ? { ...f, label: "Item pertama" } : f)],
@@ -581,7 +799,8 @@ const INV_FIELDS = [
   ["tanggal", "Tanggal", "date"], ["tempat", "Nama tempat"],
   ["akadJam", "Jam akad"], ["resepsiJam", "Jam resepsi"],
   ["alamat", "Alamat lengkap", "text", true], ["maps", "Link Google Maps", "url", true],
-  ["kutipan", "Kutipan / doa", "textarea", true]
+  ["kutipan", "Kutipan / doa", "textarea", true],
+  ["rekening", "Amplop digital: rekening / e-wallet (opsional)", "textarea", true]
 ];
 const DEFAULT_WA = "Assalamu'alaikum {nama},\n\nTanpa mengurangi rasa hormat, kami mengundang Bapak/Ibu/Saudara/i untuk hadir di hari pernikahan kami.\n\nDetail acara & konfirmasi kehadiran:\n{link}\n\nMerupakan kebahagiaan bagi kami apabila berkenan hadir dan memberikan doa restu.\n\nTerima kasih,\n{pria} & {wanita}";
 function inviteLink(g) {
@@ -616,6 +835,53 @@ ACT.saveInv = () => {
 };
 ACT.saveTpl = () => save("config", { ...settings(), id: "settings", waTemplate: $("#waTpl").value }, "Template disimpan");
 ACT.copyInv = (el) => copyText(inviteLink(S.data.guests.find((d) => d.id === el.dataset.id)));
+
+// ================= AMPLOP & KADO =================
+const AMP_FIELDS = () => [
+  { k: "nama", label: "Dari", required: true, full: true, type: "datalist", options: S.data.guests.map((g) => g.nama) },
+  { k: "jenis", label: "Jenis", type: "select", options: ["Amplop", "Transfer", "Kado barang"] },
+  { k: "jumlah", label: "Jumlah uang (Rp)", type: "number" },
+  { k: "barang", label: "Barang (kalau kado)", full: true },
+  { k: "tgl", label: "Tanggal diterima", type: "date" },
+  { k: "catatan", label: "Catatan", full: true },
+  { k: "terimakasih", label: "Sudah diucapkan terima kasih", type: "checkbox", full: true }
+];
+const guestByName = (n) => S.data.guests.find((g) => (g.nama || "").trim().toLowerCase() === String(n || "").trim().toLowerCase());
+function thanksMsg(x) {
+  const st = settings(), what = x.jenis === "Kado barang" ? (x.barang ? `kado ${x.barang}` : "kadonya") : "amplop dan doanya";
+  return `Assalamu'alaikum ${x.nama},\n\nTerima kasih banyak atas kehadiran, doa, dan ${what} di hari pernikahan kami. Semoga kebaikan Bapak/Ibu/Saudara/i dibalas berlipat ganda.\n\nSalam hangat,\n${st.pria || ""} & ${st.wanita || ""}`;
+}
+PAGES.amplop = () => {
+  const all = [...S.data.amplop].sort((a, b) => String(b.tgl || "").localeCompare(a.tgl || "") || byUrut(a, b));
+  const q = (S.ui.aQ || "").toLowerCase(), fj = S.ui.aJ || "", ft = S.ui.aT || "";
+  const list = all.filter((x) => (!q || `${x.nama} ${x.barang} ${x.catatan}`.toLowerCase().includes(q)) && (!fj || x.jenis === fj) && (!ft || (ft === "belum" ? !x.terimakasih : x.terimakasih)));
+  const uang = sum(all.filter((x) => x.jenis !== "Kado barang"), (x) => x.jumlah), kado = all.filter((x) => x.jenis === "Kado barang").length;
+  const belum = all.filter((x) => !x.terimakasih).length;
+  const kl = [...S.data.klaim].sort((a, b) => String(b.createdAt).localeCompare(a.createdAt));
+  return `<div class="page-head"><div><h1 class="page-title"><span class="cap">A</span>mplop &amp; Kado</h1><p class="page-sub">Catat amplop, transfer, dan kado yang diterima, lalu tandai yang sudah diberi ucapan terima kasih.</p></div><button class="btn" data-act="addAmp">${icon("plus", 14)} Catat</button></div>
+  <div class="grid c4">
+    <div class="card stat"><div class="k">Total uang</div><div class="v">${rp(uang)}</div><div class="d">amplop & transfer</div></div>
+    <div class="card stat"><div class="k">Kado barang</div><div class="v">${kado}</div><div class="d">${kl.length} dipilih lewat undangan</div></div>
+    <div class="card stat"><div class="k">Pemberi</div><div class="v">${all.length}</div><div class="d">catatan</div></div>
+    <div class="card stat"><div class="k">Belum diberi terima kasih</div><div class="v">${belum}</div><div class="bar" style="margin-top:8px"><i style="width:${pct(all.length - belum, all.length)}%"></i></div></div>
+  </div>
+  ${kl.length ? `<h2 class="section-title">${icon("gift", 20)} Kado yang dipilih tamu lewat undangan</h2><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Dipilih oleh</th><th class="hide-sm">Tanggal</th><th></th></tr></thead><tbody>
+    ${kl.map((k) => { const w = S.data.wishlist.find((x) => x.id === k.itemId); const rec = S.data.amplop.find((a) => a.klaimId === k.id); return `<tr><td>${esc(w ? w.nama : "(barang sudah dihapus)")}${k.pesan ? `<br><small style="color:var(--muted)">${esc(k.pesan)}</small>` : ""}</td><td>${esc(k.nama)}</td><td class="hide-sm">${esc(fmtDate(String(k.createdAt || "").slice(0, 10), { day: "numeric", month: "short" }))}</td><td style="white-space:nowrap">${rec ? `<span class="pill ok">Diterima</span>` : `<button class="btn small" data-act="klaimTerima" data-id="${k.id}">Catat diterima</button>`} <button class="icon-btn" data-act="klaimDel" data-id="${k.id}" title="Batalkan pilihan (barang tampil lagi di undangan)" aria-label="Batalkan">✕</button></td></tr>`; }).join("")}
+  </tbody></table></div>` : ""}
+  <h2 class="section-title">${icon("coin", 20)} Daftar penerimaan</h2>
+  <div class="toolbar"><input class="grow" id="ui_aQ" data-ui="aQ" placeholder="Cari nama atau barang…" value="${esc(S.ui.aQ || "")}">${uiSel("aJ", [["", "Semua jenis"], ["Amplop", "Amplop"], ["Transfer", "Transfer"], ["Kado barang", "Kado barang"]], "Jenis")}${uiSel("aT", [["", "Semua"], ["belum", "Belum terima kasih"], ["sudah", "Sudah terima kasih"]], "Terima kasih")}</div>
+  <div class="table-wrap"><table><thead><tr><th>Dari</th><th>Jenis</th><th class="num">Jumlah / barang</th><th>Terima kasih</th><th></th></tr></thead><tbody>
+  ${list.map((x) => { const g = guestByName(x.nama); return `<tr class="clickable" data-act="editAmp" data-id="${x.id}"><td>${esc(x.nama)}${x.tgl ? `<br><small style="color:var(--muted)">${esc(fmtDate(x.tgl, { day: "numeric", month: "short", year: "numeric" }))}</small>` : ""}</td><td><span class="pill ${x.jenis === "Kado barang" ? "gold" : x.jenis === "Transfer" ? "solid" : "red"}">${esc(x.jenis || "Amplop")}</span></td><td class="num">${x.jenis === "Kado barang" ? esc(x.barang || "-") : rp(x.jumlah)}</td><td><input type="checkbox" class="box" data-change="ampThanks" data-id="${x.id}" ${x.terimakasih ? "checked" : ""} aria-label="Sudah terima kasih"></td><td style="white-space:nowrap">${g && g.hp ? `<a class="btn small" target="_blank" rel="noopener" href="https://wa.me/${waNumber(g.hp)}?text=${encodeURIComponent(thanksMsg(x))}">WA terima kasih</a>` : `<button class="icon-btn" data-act="copyThanks" data-id="${x.id}">Salin ucapan</button>`}</td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">Belum ada catatan.</td></tr>`}
+  </tbody><tfoot><tr><td colspan="2">${list.length} catatan</td><td class="num">${rp(sum(list.filter((x) => x.jenis !== "Kado barang"), (x) => x.jumlah))}</td><td colspan="2"></td></tr></tfoot></table></div>`;
+};
+ACT.addAmp = () => openForm({ title: "Catat amplop / kado", fields: AMP_FIELDS(), data: { jenis: "Amplop", tgl: todayIso() }, onSave: (o) => save("amplop", { ...o, urut: nextUrut("amplop") }) });
+ACT.editAmp = (el, e) => { if (e.target.closest("[data-act]") !== el || e.target.closest("a,input")) return; const x = S.data.amplop.find((d) => d.id === el.dataset.id); openForm({ title: "Ubah catatan", fields: AMP_FIELDS(), data: x, onSave: (o) => save("amplop", o), onDelete: () => del("amplop", x.id) }); };
+ACT.ampThanks = (el) => { const x = S.data.amplop.find((d) => d.id === el.dataset.id); save("amplop", { ...x, terimakasih: el.checked }, el.checked ? "Ditandai sudah terima kasih" : "Ditandai belum"); };
+ACT.copyThanks = (el) => { const x = S.data.amplop.find((d) => d.id === el.dataset.id); copyText(thanksMsg(x)); };
+ACT.klaimTerima = (el) => { const k = S.data.klaim.find((d) => d.id === el.dataset.id), w = S.data.wishlist.find((x) => x.id === k.itemId);
+  save("amplop", { nama: k.nama, jenis: "Kado barang", barang: w ? w.nama : "", tgl: todayIso(), klaimId: k.id, terimakasih: false, urut: nextUrut("amplop") }, "Kado dicatat");
+  if (w) store.put("wishlist", { ...w, done: true }); };
+ACT.klaimDel = (el) => del("klaim", el.dataset.id);
 
 // ================= TABUNGAN =================
 const savingsNow = () => sum(S.data.tabungan, (x) => (x.jenis === "Penarikan" ? -num(x.jumlah) : num(x.jumlah)));
@@ -738,7 +1004,8 @@ PAGES.pengaturan = () => {
     <div class="card"><h3>Info pernikahan</h3><div class="dlg-body" style="padding:0;max-height:none;overflow:visible">
       ${fieldHtml({ k: "st_pria", label: "Nama mempelai pria" }, st.pria)}${fieldHtml({ k: "st_wanita", label: "Nama mempelai wanita" }, st.wanita)}
       ${fieldHtml({ k: "st_tanggal", label: "Tanggal pernikahan", type: "date" }, st.tanggal)}${fieldHtml({ k: "st_venue", label: "Venue" }, st.venue)}
-      ${fieldHtml({ k: "st_targetBudget", label: "Batas total anggaran (Rp)", type: "number", hint: "Kosongkan jika tidak ada" }, st.targetBudget || "")}${fieldHtml({ k: "st_kapasitasCatering", label: "Porsi catering", type: "number" }, st.kapasitasCatering || "")}
+      ${fieldHtml({ k: "st_targetBudget", label: "Batas total anggaran (Rp)", type: "number", hint: "Kosongkan jika tidak ada" }, st.targetBudget || "")}${fieldHtml({ k: "st_kapasitasCatering", label: "Jumlah pax (porsi catering)", type: "number", hint: "Bisa juga diubah di halaman Anggaran" }, st.kapasitasCatering || "")}
+      ${fieldHtml({ k: "st_mulai", label: "Mulai persiapan (kotak 1 ular tangga)", type: "date", hint: "Kosongkan = otomatis dari timeline" }, st.mulai || "")}
     </div><div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn" data-act="saveSt">Simpan</button></div></div>
     <div class="card"><h3>Data</h3>
       <p style="font-size:13.5px;margin:0 0 6px">Mode: <b>${isCloud ? "Online (Firebase, tersinkron)" : "Lokal (hanya di browser ini)"}</b>${S.user && !S.user.local ? ` · masuk sebagai ${esc(S.user.email)}` : ""}</p>
@@ -751,8 +1018,10 @@ PAGES.pengaturan = () => {
 };
 ACT.saveSt = () => {
   const o = { ...settings(), id: "settings" };
-  ["pria", "wanita", "tanggal", "venue"].forEach((k) => (o[k] = $("#f_st_" + k).value.trim()));
-  ["targetBudget", "kapasitasCatering"].forEach((k) => (o[k] = num($("#f_st_" + k).value)));
+  ["pria", "wanita", "tanggal", "venue", "mulai"].forEach((k) => (o[k] = $("#f_st_" + k).value.trim()));
+  ["targetBudget"].forEach((k) => (o[k] = num($("#f_st_" + k).value)));
+  const newPax = num($("#f_st_kapasitasCatering").value);
+  if (newPax !== paxNow()) { save("config", o, "Pengaturan disimpan").then(() => applyPax(newPax)); return; }
   save("config", o, "Pengaturan disimpan");
 };
 ACT.exportData = async () => {
@@ -797,7 +1066,7 @@ async function autoSeedLocal() {
 // ================= BOOT =================
 function startData() {
   unsubs.forEach((u) => u && u()); unsubs = [];
-  COLS.forEach((c) => unsubs.push(store.subscribe(c, (arr) => { S.data[c] = arr; S.loaded.add(c); render(); },
+  COLS.forEach((c) => unsubs.push(store.subscribe(c, (arr) => { S.data[c] = arr; S.loaded.add(c); render(); if (c === "wishlist" || c === "public" || c === "config") syncKado(); },
     (err) => { if (err.code === "permission-denied") toast("Akses ditolak. Periksa firestore.rules & email yang diizinkan."); })));
 }
 function showLogin(msg = "") {
@@ -817,6 +1086,7 @@ function setupCover() {
 }
 async function boot() {
   setupCover();
+  try { startCover($("#coverScene"), $("#coverBg")); } catch (e) { console.warn("animasi pixel", e); }
   store = await createStore();
   $("#whoDot").classList.toggle("local", !isCloud);
   $("#loginForm").onsubmit = async (e) => {
