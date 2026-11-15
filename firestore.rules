@@ -31,5 +31,17 @@ service cloud.firestore {
         && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40
         && (!('guestId' in request.resource.data) || (request.resource.data.guestId is string && request.resource.data.guestId.size() <= 40));
     }
+    // Daftar kado: tamu boleh melihat barang mana yang sudah dipilih, dan MEMILIH
+    // satu barang (sekali saja per barang). Tidak bisa mengubah atau menghapus.
+    match /klaim/{itemId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['itemId', 'nama', 'pesan', 'createdAt', 'guestId'])
+        && request.resource.data.itemId == itemId
+        && request.resource.data.nama is string
+        && request.resource.data.nama.size() > 0 && request.resource.data.nama.size() <= 80
+        && (!('pesan' in request.resource.data) || (request.resource.data.pesan is string && request.resource.data.pesan.size() <= 200))
+        && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40
+        && (!('guestId' in request.resource.data) || (request.resource.data.guestId is string && request.resource.data.guestId.size() <= 40));
+    }
   }
 }
