@@ -704,3 +704,41 @@ canvas.px { image-rendering: pixelated; image-rendering: crisp-edges; display: b
 .kado-tag.claimed { color: var(--green); background: var(--ok-soft); }
 .kado-card { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
 .kado-switch { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; white-space: nowrap; }
+
+/* ---------- Wishlist: tab Barang / Kegiatan ---------- */
+.seg-tabs { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 16px; background: var(--paper-2); border: 1px solid color-mix(in srgb, var(--maroon) 18%, transparent); border-radius: 999px; max-width: 100%; }
+.seg-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--maroon); font: 500 14px/1 var(--f-body); padding: 9px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.seg-tabs button small { font-size: 11px; background: color-mix(in srgb, var(--maroon) 12%, transparent); padding: 2px 7px; border-radius: 999px; }
+.seg-tabs button.on { background: var(--maroon); color: var(--paper); box-shadow: 0 2px 6px rgba(60, 10, 20, .18); }
+.seg-tabs button.on small { background: rgba(255, 255, 255, .22); }
+.seg-tabs button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* Kartu "Impian kita berdua" + kucing pixel */
+.keg-hero { --pk: #f9d3e0; --pk2: #f4b8cc; --mint: #c9eef0; --pline: #4a3346;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; margin: 0 0 18px; padding: 14px 18px;
+  background: var(--pk); background-image: radial-gradient(var(--pk2) 1px, transparent 1.4px); background-size: 8px 8px;
+  border: 3px solid var(--pline); border-radius: 10px; box-shadow: 5px 6px 0 rgba(74, 51, 70, .18); color: var(--pline); }
+.keg-cats { background: #fffaf6; border: 3px solid var(--pline); padding: 6px; box-shadow: 4px 4px 0 rgba(74, 51, 70, .25); line-height: 0; }
+.px-cats { display: block; image-rendering: pixelated; }
+.px-cats .cats-body { animation: catsnuggle 1.6s steps(2) infinite; transform-origin: 50% 100%; }
+.px-cats .cats-hearts { animation: catshearts 1.2s steps(3) infinite; }
+@keyframes catsnuggle { 50% { transform: translateY(-.6px); } }
+@keyframes catshearts { 0% { transform: translateY(0); opacity: 1; } 50% { transform: translateY(-1px); } 100% { transform: translateY(0); opacity: .85; } }
+@media (prefers-reduced-motion: reduce) { .px-cats .cats-body, .px-cats .cats-hearts { animation: none; } }
+.keg-info { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.keg-title { margin: 0; font-size: 12px; line-height: 1.5; }
+.keg-count { display: flex; align-items: baseline; gap: 8px; }
+.keg-count b { font: 400 30px/1 "Press Start 2P", monospace; }
+.keg-count span { font-size: 13px; }
+.keg-bar { height: 16px; border: 3px solid var(--pline); background: #fff; }
+.keg-bar i { display: block; height: 100%; background: repeating-linear-gradient(90deg, #f07fa0 0 8px, #f59ab4 8px 10px); transition: width .4s steps(8); }
+.keg-msg { margin: 0; background: #fff; border: 2px solid var(--pline); padding: 7px 10px; font-size: 9.5px; line-height: 1.6; }
+.keg-cost { font-size: 12.5px; color: #6b4a60; }
+.pill.keg-when { background: #e6ebcf; color: #4f5a2a; }
+@media (max-width: 560px) {
+  .keg-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 14px; }
+  .keg-info { width: 100%; align-items: stretch; }
+  .keg-count { justify-content: center; }
+  .seg-tabs { display: flex; width: 100%; }
+  .seg-tabs button { flex: 1; justify-content: center; padding: 9px 8px; font-size: 13px; }
+}

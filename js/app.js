@@ -1,9 +1,9 @@
 import { createStore, isCloud } from "./store.js";
 import { allowedEmails } from "./config.js";
 import { icon, ICON_NAMES } from "./icons.js";
-import { startCover, setBoard, mountBoard, replayBoard, pixelatePhoto, pixelFace, pixelHeart, petBurst } from "./pixel.js";
+import { startCover, setBoard, mountBoard, replayBoard, pixelatePhoto, pixelFace, pixelHeart, petBurst, pixelCats } from "./pixel.js";
 
-const COLS = ["config", "public", "guests", "budget", "tasks", "seserahan", "mahar", "vendors", "rundown", "rsvp", "timeline", "tabungan", "wishlist", "amplop", "klaim"];
+const COLS = ["config", "public", "guests", "budget", "tasks", "seserahan", "mahar", "vendors", "rundown", "rsvp", "timeline", "tabungan", "wishlist", "kegiatan", "amplop", "klaim"];
 const DATA_COLS = COLS; // yang ikut backup
 const S = { data: Object.fromEntries(COLS.map((c) => [c, []])), loaded: new Set(), ui: {} };
 let store, unsubs = [];
@@ -104,7 +104,7 @@ const palVar = (i) => { const [c, soft] = PAL[((i % PAL.length) + PAL.length) % 
 // [kunci, label, ikon, warna ikon di header marun, warna aksen halaman]
 const NAV = [
   ["beranda", "Beranda", "home", "#f2c46d", "#5c0d16"], ["anggaran", "Anggaran", "wallet", "#e8a07f", "#a8553a"], ["tabungan", "Tabungan", "piggy", "#c6cf6e", "#2f4a2b"],
-  ["tamu", "Tamu & RSVP", "guests", "#edc6c4", "#7a1a2a"], ["persiapan", "Persiapan", "check", "#e2b77a", "#8a4a1e"], ["seserahan", "Seserahan & Mahar", "gift", "#e8a9b2", "#9b5662"], ["wishlist", "Wishlist Rumah", "heart", "#f2c46d", "#8f6a2c"], ["amplop", "Amplop & Kado", "coin", "#e8a07f", "#a8553a"],
+  ["tamu", "Tamu & RSVP", "guests", "#edc6c4", "#7a1a2a"], ["persiapan", "Persiapan", "check", "#e2b77a", "#8a4a1e"], ["seserahan", "Seserahan & Mahar", "gift", "#e8a9b2", "#9b5662"], ["wishlist", "Wishlist", "heart", "#f2c46d", "#8f6a2c"], ["amplop", "Amplop & Kado", "coin", "#e8a07f", "#a8553a"],
   ["vendor", "Vendor", "store", "#c9a15e", "#8f6a2c"], ["rundown", "Rundown", "clock", "#a9c48a", "#2f4a2b"], ["moodboard", "Moodboard", "palette", "#c6cf6e", "#7a1a2a"],
   ["undangan", "Undangan", "envelope", "#edc6c4", "#7a1a2a"], ["pengaturan", "Pengaturan", "gear", "#d8c7a8", "#8a4a1e"]
 ];
@@ -655,7 +655,8 @@ const maharCats = () => [...new Set(["Perhiasan", "Uang", "Logam Mulia", "Alat S
 const CAT = {
   seserahan: { title: "seserahan", fields: () => SES_FIELDS(sesCats()), price: sesPrice, def: { toko: "Shopee" } },
   mahar: { title: "mahar", fields: () => MAHAR_FIELDS(maharCats()), price: (x) => num(x.harga), def: {} },
-  wishlist: { title: "wishlist", fields: () => WISH_FIELDS(wishCats()), price: wishPrice, def: { prioritas: "Penting", jumlah: 1 }, icon: "home", pal: 2 }
+  wishlist: { title: "wishlist", fields: () => WISH_FIELDS(wishCats()), price: wishPrice, def: { prioritas: "Penting", jumlah: 1 }, icon: "home", pal: 2 },
+  kegiatan: { title: "kegiatan", fields: () => KEG_FIELDS(kegCats()), price: (x) => num(x.biaya), def: { kapan: "Tahun pertama" }, icon: "sparkle", pal: 4 }
 };
 function catCard(col, kat, items, ci = 0) {
   const c = CAT[col];
@@ -707,16 +708,21 @@ function syncKado() {
     try { await store.put("public", { id: "kado", items, aktif }); } catch (e) { console.warn("sync kado", e); }
   }, 800);
 }
+const wishTabs = (cur) => `<div class="seg-tabs" role="tablist" aria-label="Jenis wishlist">${[["barang", "home", "Barang rumah", S.data.wishlist.length], ["kegiatan", "sparkle", "Kegiatan", S.data.kegiatan.length]].map(([k, ic, l, n]) => `<button type="button" role="tab" aria-selected="${cur === k}" class="${cur === k ? "on" : ""}" data-act="wTab" data-tab="${k}">${icon(ic, 16)} ${l}<small>${n}</small></button>`).join("")}</div>`;
+ACT.wTab = (el) => { S.ui.wTab = el.dataset.tab; try { localStorage.setItem("wTab", S.ui.wTab); } catch (e) {} render(); };
+const curWTab = () => { if (!S.ui.wTab) { try { S.ui.wTab = localStorage.getItem("wTab") || "barang"; } catch (e) { S.ui.wTab = "barang"; } } return S.ui.wTab === "kegiatan" ? "kegiatan" : "barang"; };
 PAGES.wishlist = () => {
+  if (curWTab() === "kegiatan") return kegiatanPage();
   const all = S.data.wishlist, fp = S.ui.wP || "", fs = S.ui.wS || "";
   const list = all.filter((x) => (!fp || (x.prioritas || "Penting") === fp) && (!fs || (fs === "belum" ? !x.done : x.done)));
   const tot = sum(all, wishPrice), have = sum(all.filter((x) => x.done), wishPrice), wajib = sum(all.filter((x) => !x.done && x.prioritas === "Wajib"), wishPrice);
   const done = all.filter((x) => x.done).length;
-  return `<div class="page-head"><div><h1 class="page-title"><span class="cap">W</span>ishlist Rumah</h1><p class="page-sub">Barang yang ingin kalian punya setelah menikah. Kelompokkan per ruangan, beri prioritas, dan centang yang sudah ada. Tidak dihitung ke anggaran pernikahan.</p></div>
+  return `<div class="page-head"><div><h1 class="page-title"><span class="cap">W</span>ishlist</h1><p class="page-sub">Barang yang ingin kalian punya setelah menikah. Kelompokkan per ruangan, beri prioritas, dan centang yang sudah ada. Tidak dihitung ke anggaran pernikahan.</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn outline" data-act="addCat" data-col="wishlist">${icon("plus", 14)} Ruangan baru</button><button class="btn" data-act="addInCat" data-col="wishlist">${icon("plus", 14)} Barang</button></div></div>
   <div class="ticket gold" style="--stub:130px;margin-bottom:16px"><div class="t-main"><div class="t-row"><p class="t-title">${icon("home", 20)} Rumah kita nanti</p><div class="t-big ses-grand">${rp(tot)}</div></div>
     <div class="ses-sum"><div><div class="t-label">Total perkiraan</div><div class="sv">${rp(tot)}</div></div><div><div class="t-label">Sudah punya</div><div class="sv">${rp(have)}</div></div><div><div class="t-label">Belum</div><div class="sv">${rp(tot - have)}</div></div><div><div class="t-label">Wajib, belum ada</div><div class="sv">${rp(wajib)}</div></div></div></div>
     <div class="t-stub"><span class="t-label">Terpenuhi</span><b style="font:500 28px/1 var(--f-display)">${done}/${all.length}</b><div class="barcode"></div></div></div>
+  ${wishTabs("barang")}
   ${wishKadoCard()}
   <div class="toolbar">${uiSel("wP", [["", "Semua prioritas"], ["Wajib", "Wajib"], ["Penting", "Penting"], ["Nanti saja", "Nanti saja"]], "Prioritas")}${uiSel("wS", [["", "Semua"], ["belum", "Belum punya"], ["sudah", "Sudah punya"]], "Status")}</div>
   ${all.length ? `<div class="grid c2">${[...groupBy(list)].map(([k, it], i) => catCard("wishlist", k, it, i)).join("") || `<div class="card empty">Tidak ada barang yang cocok dengan filter.</div>`}</div>`
@@ -738,6 +744,58 @@ const WISH_SEED = [
 ];
 ACT.seedWish = async () => { await store.bulk("wishlist", WISH_SEED.map(([kategori, nama, prioritas, harga], i) => ({ kategori, nama, prioritas, harga, jumlah: 1, done: false, urut: i + 1 }))); toast("Contoh wishlist dimuat. Ubah atau hapus sesuai kebutuhan."); };
 
+// ================= WISHLIST KEGIATAN (manifestasi berdua) =================
+const KEG_KAPAN = ["Bulan madu", "Tahun pertama", "1–3 tahun", "Suatu hari nanti"];
+const KEG_FIELDS = (cats) => [
+  { k: "nama", label: "Kegiatan / impian", required: true, full: true, ph: "Umroh berdua, road trip ke Bali, masak bareng tiap Minggu…" },
+  { k: "kategori", label: "Kategori", type: "datalist", options: cats },
+  { k: "kapan", label: "Target kapan", type: "select", options: KEG_KAPAN },
+  { k: "biaya", label: "Perkiraan biaya (Rp, opsional)", type: "number" },
+  { k: "tempat", label: "Tempat (opsional)" },
+  { k: "catatan", label: "Kenapa ingin ini / catatan", full: true, ph: "Tulis niatnya, biar jadi doa juga" },
+  { k: "done", label: "Sudah terwujud", type: "checkbox", full: true },
+  { k: "kenangan", label: "Cerita setelah terwujud (opsional)", full: true, ph: "Tanggal, momen lucu, foto disimpan di mana…" }
+];
+const kegCats = () => [...new Set(["Ibadah", "Jalan-jalan", "Kebiasaan Baik", "Belajar Bareng", "Kuliner", "Keuangan", "Seru-seruan", ...S.data.kegiatan.map((x) => x.kategori).filter(Boolean)])];
+const KEG_SEED = [
+  ["Ibadah", "Umroh berdua", "1–3 tahun", 70000000], ["Ibadah", "Sholat berjamaah tiap Subuh", "Tahun pertama", 0], ["Ibadah", "Khatam Al-Qur'an bareng", "Tahun pertama", 0],
+  ["Jalan-jalan", "Bulan madu", "Bulan madu", 10000000], ["Jalan-jalan", "Road trip keliling Jawa", "1–3 tahun", 5000000], ["Jalan-jalan", "Lihat sunrise di Bromo", "Suatu hari nanti", 2000000],
+  ["Kebiasaan Baik", "Olahraga pagi bareng tiap akhir pekan", "Tahun pertama", 0], ["Kebiasaan Baik", "Date night sebulan sekali", "Tahun pertama", 300000],
+  ["Belajar Bareng", "Kelas masak berdua", "Tahun pertama", 500000], ["Belajar Bareng", "Belajar bahasa baru", "Suatu hari nanti", 0],
+  ["Keuangan", "Dana darurat 6 bulan", "1–3 tahun", 0], ["Seru-seruan", "Foto studio tiap anniversary", "Tahun pertama", 500000], ["Seru-seruan", "Adopsi kucing", "Suatu hari nanti", 1000000]
+];
+ACT.seedKeg = async () => { await store.bulk("kegiatan", KEG_SEED.map(([kategori, nama, kapan, biaya], i) => ({ kategori, nama, kapan, biaya, done: false, urut: i + 1 }))); toast("Contoh kegiatan dimuat. Ubah atau hapus sesuai impian kalian."); };
+function kegCard(kat, items, ci = 0) {
+  const done = items.filter((x) => x.done).length;
+  return `<div class="card tint" style="${palVar(ci + CAT.kegiatan.pal)}"><div class="cat-head"><h3 style="margin:0;min-width:0;overflow-wrap:anywhere"><span class="cat-dot">${icon("sparkle", 15)}</span>${esc(kat)} <small style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none">· ${done}/${items.length} terwujud</small></h3>
+    <div class="acts"><button class="icon-btn" data-act="addInCat" data-col="kegiatan" data-cat="${esc(kat)}" aria-label="Tambah kegiatan" title="Tambah kegiatan">${icon("plus", 16)}</button><button class="icon-btn" data-act="renCat" data-col="kegiatan" data-cat="${esc(kat)}" aria-label="Ubah kategori" title="Ubah nama kategori">${icon("edit", 16)}</button></div></div>
+    <ul class="check-list" style="margin-top:6px">${items.map((x) => `<li class="${x.done ? "done" : ""}"><input type="checkbox" class="box" id="ck_${x.id}" data-change="toggleItem" data-col="kegiatan" data-id="${x.id}" ${x.done ? "checked" : ""} aria-label="Sudah terwujud">
+      <div class="name"><span>${esc(x.nama)}${x.kapan ? ` <span class="pill prio keg-when">${esc(x.kapan)}</span>` : ""}</span><small>${[x.tempat, x.done && x.kenangan ? "✨ " + x.kenangan : x.catatan].filter(Boolean).map(esc).join(" · ")}</small></div>
+      <div class="item-price num"><b>${num(x.biaya) ? rp(x.biaya) : ""}</b></div>
+      <button class="icon-btn" data-act="editItem" data-col="kegiatan" data-id="${x.id}" aria-label="Ubah">${icon("edit", 16)}</button></li>`).join("")}</ul></div>`;
+}
+function kegiatanPage() {
+  const all = S.data.kegiatan, fk = S.ui.kW || "", fs = S.ui.kS || "";
+  const list = all.filter((x) => (!fk || (x.kapan || "") === fk) && (!fs || (fs === "belum" ? !x.done : x.done)));
+  const done = all.filter((x) => x.done).length, pct = all.length ? Math.round((done / all.length) * 100) : 0;
+  const biaya = sum(all.filter((x) => !x.done), (x) => x.biaya);
+  const msg = !all.length ? "Tulis impian pertama kalian!" : done === all.length ? "Semua impian terwujud! Tulis yang baru ya" : done ? `${done} impian sudah terwujud. Lanjut!` : "Semoga semuanya terwujud. Aamiin";
+  return `<div class="page-head"><div><h1 class="page-title"><span class="cap">W</span>ishlist</h1><p class="page-sub">Bukan cuma barang: tulis hal-hal yang ingin kalian lakukan berdua setelah menikah. Anggap saja daftar manifestasi. Centang kalau sudah terwujud, lalu tulis ceritanya.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn outline" data-act="addCat" data-col="kegiatan">${icon("plus", 14)} Kategori baru</button><button class="btn" data-act="addInCat" data-col="kegiatan">${icon("plus", 14)} Kegiatan</button></div></div>
+  ${wishTabs("kegiatan")}
+  <section class="keg-hero" aria-label="Ringkasan impian berdua">
+    <div class="keg-cats">${pixelCats(150)}</div>
+    <div class="keg-info"><p class="px-font keg-title">Impian kita berdua</p>
+      <div class="keg-count"><b>${done}</b><span>/ ${all.length} terwujud</span></div>
+      <div class="keg-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Impian terwujud"><i style="width:${pct}%"></i></div>
+      <p class="keg-msg px-font">${esc(msg)}</p>
+      ${biaya ? `<small class="keg-cost">Perkiraan biaya yang belum terwujud: <b>${rp(biaya)}</b></small>` : ""}</div>
+  </section>
+  ${all.length ? `<div class="toolbar">${uiSel("kW", [["", "Semua target"], ...KEG_KAPAN.map((k) => [k, k])], "Target kapan")}${uiSel("kS", [["", "Semua"], ["belum", "Belum terwujud"], ["sudah", "Sudah terwujud"]], "Status")}</div>
+    <div class="grid c2">${[...groupBy(list)].map(([k, it], i) => kegCard(k, it, i)).join("") || `<div class="card empty">Tidak ada kegiatan yang cocok dengan filter.</div>`}</div>`
+    : `<div class="card empty"><span style="color:var(--gold)">${icon("sparkle", 40)}</span><p>Belum ada kegiatan. Mulai dari yang paling kalian tunggu, misalnya bulan madu atau ibadah bareng.</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn small" data-act="seedKeg">Isi contoh daftar</button><button class="btn outline small" data-act="addInCat" data-col="kegiatan">+ Tambah kegiatan</button></div></div>`}`;
+}
+
 ACT.addCat = (el) => {
   const col = el.dataset.col, c = CAT[col];
   openForm({ title: `Kategori ${c.title} baru`, fields: [{ k: "kategori", label: "Nama kategori", required: true, full: true }, ...c.fields().filter((f) => f.k !== "kategori").map((f) => f.k === "nama" ? { ...f, label: "Item pertama" } : f)],
@@ -745,7 +803,7 @@ ACT.addCat = (el) => {
 };
 ACT.addInCat = (el) => { const col = el.dataset.col, c = CAT[col]; openForm({ title: `Tambah ${c.title}`, fields: c.fields(), data: { ...c.def, kategori: el.dataset.cat || "" }, onSave: (o) => save(col, { ...o, urut: nextUrut(col) }) }); };
 ACT.editItem = (el) => { const col = el.dataset.col, x = S.data[col].find((d) => d.id === el.dataset.id); openForm({ title: `Ubah ${CAT[col].title}`, fields: CAT[col].fields(), data: x, onSave: (o) => save(col, o), onDelete: () => del(col, x.id) }); };
-ACT.toggleItem = (el) => { const col = el.dataset.col, x = S.data[col].find((d) => d.id === el.dataset.id); save(col, { ...x, done: el.checked }, el.checked ? "Siap ✓" : "Ditandai belum"); };
+ACT.toggleItem = (el) => { const col = el.dataset.col, x = S.data[col].find((d) => d.id === el.dataset.id); save(col, { ...x, done: el.checked }, el.checked ? (col === "kegiatan" ? "Alhamdulillah, terwujud ✨" : "Siap ✓") : "Ditandai belum"); };
 ACT.renCat = (el) => {
   const col = el.dataset.col, old = el.dataset.cat, items = S.data[col].filter((x) => (x.kategori || "Lainnya") === old);
   openForm({ title: "Ubah kategori", saveLabel: "Simpan nama", fields: [{ k: "kategori", label: "Nama kategori", required: true, full: true, hint: `Hapus kategori akan menghapus ${items.length} item di dalamnya.` }], data: { kategori: old },

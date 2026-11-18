@@ -312,3 +312,55 @@ export function petBurst(screen) {
     screen.appendChild(s); setTimeout(() => s.remove(), 2200);
   }
 }
+
+// ---------- Dua kucing berpelukan (pixel art dari kalian), 33×33 ----------
+// k garis, o oranye, g abu, p pink, w putih, r hati (dianimasikan terpisah)
+const CATS = [
+  "..........r.r....................",
+  "..........rrr..............r.r...",
+  "...........r...............rrr...",
+  "......k.........kk...rr.rr..r....",
+  ".....kok.......kook..rrrrr.......",
+  ".....kpok.....koopk...rrr........",
+  ".....kppokkkkkkoppkk...r.........",
+  ".....kpppoooooooppkgk............",
+  ".....kppooooooooopkpgk.....kkk...",
+  ".....kooooooooooookpgkkkk.kgpk...",
+  ".....kooooooooooookpgggggkgppk...",
+  "....koooookoooookokgggggggpppk...",
+  "....koooookowwwokokgggwggggppk...",
+  "....koooooowwpwwookggwwgggggk....",
+  ".....koooowwwwwwwkgkgwwgggggk....",
+  ".r.r..koowwwwwwwkppwwpwkkgggk....",
+  ".rrr...kkkwwwwwkkggwwwwwppggk.r.r",
+  "..r...kooowwwwwwokwwwwwwggggk.rrr",
+  ".....kooowwwwwwwokkwwwwwwwgk...r.",
+  "....koooowwwwwwwwkgwwwwwwkkk.....",
+  "...kooooooowwwwwokwwwwwwggggk....",
+  "...kooooooowwwwwokwwwwwwgggggk...",
+  "..kooookoooowwwookgwwwwgggggggk..",
+  "..koooookoooowkookggwwwgggggggk..",
+  "..kooooookoookoookggkwggggkggggk.",
+  "..kooooookoookoookgggkgggkgggggk.",
+  ".koooooookoookoookgggkgggkgggggk.",
+  "kookooookkoookookwkggkgggkgggkgk.",
+  "koookooowwkwwkwwwkkggkggkkkkkggk.",
+  "kooookkkkkkwwwkwwkkwkwwwkwwgggk..",
+  ".koooooooookkkkkk..kkkkkkkkkkk...",
+  "..kkooooook......................",
+  "....kkkkkk......................."
+];
+const CAT_COL = { k: "#3b2a35", o: "#e8964a", g: "#a3a29e", p: "#f4a9b8", w: "#fffdf8", r: "#e0525a" };
+export function pixelCats(size = 160, cls = "") {
+  let body = "", hearts = "";
+  CATS.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) { // gabungkan pixel sewarna sebaris supaya SVG ringan
+      const c = row[x]; let n = 1;
+      while (row[x + n] === c) n++;
+      if (c !== ".") { const r = `<rect x="${x}" y="${y}" width="${n}" height="1" fill="${CAT_COL[c]}"/>`; if (c === "r") hearts += r; else body += r; }
+      x += n;
+    }
+  });
+  return `<svg class="px-cats ${cls}" viewBox="0 0 33 33" width="${size}" height="${size}" shape-rendering="crispEdges" role="img" aria-label="Dua kucing pixel berpelukan"><g class="cats-body">${body}</g><g class="cats-hearts">${hearts}</g></svg>`;
+}
