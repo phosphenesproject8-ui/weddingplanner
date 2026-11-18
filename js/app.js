@@ -1,7 +1,7 @@
-import { createStore, isCloud } from "./store.js";
-import { allowedEmails } from "./config.js";
-import { icon, ICON_NAMES } from "./icons.js";
-import { startCover, setBoard, mountBoard, replayBoard, pixelatePhoto, pixelFace, pixelHeart, petBurst, pixelCats } from "./pixel.js";
+import { createStore, isCloud } from "./store.js?v=20261118b";
+import { allowedEmails } from "./config.js?v=20261118b";
+import { icon, ICON_NAMES } from "./icons.js?v=20261118b";
+import { startCover, setBoard, mountBoard, replayBoard, pixelatePhoto, pixelFace, pixelHeart, petBurst, pixelCats } from "./pixel.js?v=20261118b";
 
 const COLS = ["config", "public", "guests", "budget", "tasks", "seserahan", "mahar", "vendors", "rundown", "rsvp", "timeline", "tabungan", "wishlist", "kegiatan", "amplop", "klaim"];
 const DATA_COLS = COLS; // yang ikut backup
@@ -719,10 +719,10 @@ PAGES.wishlist = () => {
   const done = all.filter((x) => x.done).length;
   return `<div class="page-head"><div><h1 class="page-title"><span class="cap">W</span>ishlist</h1><p class="page-sub">Barang yang ingin kalian punya setelah menikah. Kelompokkan per ruangan, beri prioritas, dan centang yang sudah ada. Tidak dihitung ke anggaran pernikahan.</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn outline" data-act="addCat" data-col="wishlist">${icon("plus", 14)} Ruangan baru</button><button class="btn" data-act="addInCat" data-col="wishlist">${icon("plus", 14)} Barang</button></div></div>
+  ${wishTabs("barang")}
   <div class="ticket gold" style="--stub:130px;margin-bottom:16px"><div class="t-main"><div class="t-row"><p class="t-title">${icon("home", 20)} Rumah kita nanti</p><div class="t-big ses-grand">${rp(tot)}</div></div>
     <div class="ses-sum"><div><div class="t-label">Total perkiraan</div><div class="sv">${rp(tot)}</div></div><div><div class="t-label">Sudah punya</div><div class="sv">${rp(have)}</div></div><div><div class="t-label">Belum</div><div class="sv">${rp(tot - have)}</div></div><div><div class="t-label">Wajib, belum ada</div><div class="sv">${rp(wajib)}</div></div></div></div>
     <div class="t-stub"><span class="t-label">Terpenuhi</span><b style="font:500 28px/1 var(--f-display)">${done}/${all.length}</b><div class="barcode"></div></div></div>
-  ${wishTabs("barang")}
   ${wishKadoCard()}
   <div class="toolbar">${uiSel("wP", [["", "Semua prioritas"], ["Wajib", "Wajib"], ["Penting", "Penting"], ["Nanti saja", "Nanti saja"]], "Prioritas")}${uiSel("wS", [["", "Semua"], ["belum", "Belum punya"], ["sudah", "Sudah punya"]], "Status")}</div>
   ${all.length ? `<div class="grid c2">${[...groupBy(list)].map(([k, it], i) => catCard("wishlist", k, it, i)).join("") || `<div class="card empty">Tidak ada barang yang cocok dengan filter.</div>`}</div>`
